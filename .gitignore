@@ -34,3 +34,4 @@
 # Platformio
 *.vscode
 LED/*/README
+DHT11/*/README

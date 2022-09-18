@@ -33,5 +33,5 @@
 
 # Platformio
 *.vscode
-LED/*/README
-DHT11/*/README
+*/*/README
+**/CONFIGS.hpp

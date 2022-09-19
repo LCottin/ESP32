@@ -91,13 +91,9 @@ void setup()
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(SPIFFS, "/index.html", String(), false, processor); });
 
-    // Route to read temperature
-    server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send_P(200, "text/plain", readDHTTemperature().c_str()); });
-
-    // Route to read humidity
-    server.on("/humidity", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send_P(200, "text/plain", readDHTHumidity().c_str()); });
+    // Route for style.css file
+    server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(SPIFFS, "/style.css", "text/css"); });
 
     // Start server
     server.begin();

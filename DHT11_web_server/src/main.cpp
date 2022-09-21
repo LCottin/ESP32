@@ -21,12 +21,13 @@ AsyncWebServer server(80);
 String readDHTTemperature()
 {
     float t = dht.readTemperature();
+    static float t_mem;
     if (isnan(t))
     {
-        Serial.println("Failed to read temperature from DHT sensor !");
-        return String("--");
+        Serial.println("Failed to read temperature from DHT sensor ! Kept the old value");
+        return String(t_mem);
     }
-
+    t_mem = t;
     Serial.println("Read temperature : " + String(t) + "°C");
     return String(t);
 }
@@ -34,11 +35,13 @@ String readDHTTemperature()
 String readDHTHumidity()
 {
     float h = dht.readHumidity();
+    static float h_mem;
     if (isnan(h))
     {
-        Serial.println("Failed to read humidity from DHT sensor !");
-        return String("--");
+        Serial.println("Failed to read humidity from DHT sensor ! Kept the old value");
+        return String(h_mem);
     }
+    h_mem = h;
     Serial.println("Read humidity : " + String(h) + "°C");
     return String(h);
 }

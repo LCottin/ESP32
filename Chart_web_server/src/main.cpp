@@ -125,6 +125,12 @@ void setup()
     {
         request->send(200, "text/plain", readDHTHumidity().c_str());
     });
+    
+    // Print chart in another page
+    server.on("/chart", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/chart.html", String());
+    });
 
     // Start server
     server.begin();

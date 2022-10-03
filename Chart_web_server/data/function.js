@@ -17,7 +17,7 @@ var chartT = new Highcharts.Chart({
     xAxis : 
     {
         type                 : 'datetime',
-        dateTimeLabelFormats : { second : '%H :%M :%S' }
+        dateTimeLabelFormats : { second : '%H : %M' }
     },
     yAxis : 
     {
@@ -47,7 +47,7 @@ var chartH = new Highcharts.Chart({
     xAxis : 
     {
         type                 : 'datetime',
-        dateTimeLabelFormats : { second : '%H :%M :%S' }
+        dateTimeLabelFormats : { second : '%H : %M' }
     },
     yAxis  : 
     {

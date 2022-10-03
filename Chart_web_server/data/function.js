@@ -1,8 +1,9 @@
 /* Chart for temperature */
 var chartT = new Highcharts.Chart({
     chart  : { renderTo  : 'chart-temperature' },
-    title  : { text : 'Temperature' },
-    series : [{
+    title  : { text      : 'Temperature' },
+    series : 
+    [{
         showInLegend : false,
         data         : []
     }],
@@ -22,8 +23,8 @@ var chartT = new Highcharts.Chart({
     yAxis : 
     {
         title : { text : 'Temperature (Celsius)' },
-        min  : -10,
-        max  : 40
+        min   : -10,
+        max   : 40
     },
     credits : { enabled : false }
 });
@@ -32,7 +33,8 @@ var chartT = new Highcharts.Chart({
 var chartH = new Highcharts.Chart({
     chart  : { renderTo : 'chart-humidity' },
     title  : { text     : 'Humidity' },
-    series : [{
+    series : 
+    [{
         showInLegend : false,
         data : []
     }],

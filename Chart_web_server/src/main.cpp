@@ -4,16 +4,12 @@
 #include "DHT.h"
 #include "CONFIGS.hpp"
 
-#define DHTPIN 14
+#define DHTPIN  14
 #define DHTTYPE DHT11
+#define LED     2
 
 // Create DHT object
 DHT dht(DHTPIN, DHTTYPE);
-
-// Wifi settings
-const char led       = 2;
-const char *ssid     = SSID;
-const char *password = PASSWORD;
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -63,7 +59,7 @@ String processor(const String &var)
 void setup()
 {
     Serial.begin(115200);
-    pinMode(led, OUTPUT);
+    pinMode(LED, OUTPUT);
 
     // Initialize SPIFFS
     if (!SPIFFS.begin(true))
@@ -78,13 +74,13 @@ void setup()
 
     // Connect to Wi-Fi
     unsigned attempts = 0;
-    bool led_on = false;
-    WiFi.begin(ssid, password);
+    bool led_on       = false;
+    WiFi.begin(SSID, PASSWORD);
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(1000);
         Serial.println("Connecting to WiFi.. Attempt " + String(++attempts));
-        digitalWrite(led, led_on);
+        digitalWrite(LED, led_on);
         led_on = !led_on;
         if (attempts > 10)
         {
@@ -136,7 +132,7 @@ void setup()
     server.begin();
 
     // Light the LED when connected
-    digitalWrite(led, HIGH);
+    digitalWrite(LED, HIGH);
 }
 
 void loop()

@@ -69,37 +69,22 @@ setInterval(function ()
         if ((this.readyState == 4) && (this.status == 200)) 
         {
             var x = (new Date()).getTime();
-            var y = parseFloat(this.responseText);
+            var temp = parseFloat(this.responseText.split(" ")[0]);
+            var humi = parseFloat(this.responseText.split(" ")[1]);
+            
             if (chartT.series[0].data.length > 40) 
             {
-                chartT.series[0].addPoint([x, y], true, true, true);
+                chartT.series[0].addPoint([x, temp], true, true, true);
+                chartH.series[0].addPoint([x, humi], true, true, true);
             } 
             else 
             {
-                chartT.series[0].addPoint([x, y], true, false, true);
+                chartT.series[0].addPoint([x, temp], true, false, true);
+                chartH.series[0].addPoint([x, humi], true, false, true);
             }
         }
     };
-    xhttp.open("GET", "/temperature", true);
+    xhttp.open("GET", "/data", true);
     xhttp.send();
 
-    xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function ()
-    {
-        if ((this.readyState == 4) && (this.status == 200)) 
-        {
-            var x = (new Date()).getTime();
-            var y = parseFloat(this.responseText);
-            if (chartH.series[0].data.length > 40) 
-            {
-                chartH.series[0].addPoint([x, y], true, true, true);
-            } 
-            else 
-            {
-                chartH.series[0].addPoint([x, y], true, false, true);
-            }
-        }
-    }
-    xhttp.open("GET", "/humidity", true);
-    xhttp.send();
 }, 3000);

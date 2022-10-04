@@ -3,10 +3,13 @@
 #include "ESPAsyncWebServer.h"
 #include "DHT.h"
 #include "CONFIGS.hpp"
+#include <vector>
 
 #define DHTPIN  14
 #define DHTTYPE DHT11
 #define LED     2
+
+using namespace std;
 
 // Create DHT object
 DHT dht(DHTPIN, DHTTYPE);
@@ -14,6 +17,19 @@ DHT dht(DHTPIN, DHTTYPE);
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
+// Create struct to store sensor data
+typedef struct 
+{
+    float temperature;
+    float humidity;
+} Data;
+vector<Data> data(10);
+uint16_t data_index;
+
+/**
+ * @brief Read temperature from DHT11 sensor
+ * @return String containing temperature
+ */
 String readDHTTemperature()
 {
     float t = dht.readTemperature();
@@ -28,6 +44,10 @@ String readDHTTemperature()
     return String(t);
 }
 
+/**
+ * @brief Read humidity from DHT11 sensor
+ * @return String containing humidity
+ */
 String readDHTHumidity()
 {
     float h = dht.readHumidity();
@@ -42,7 +62,26 @@ String readDHTHumidity()
     return String(h);
 }
 
-// Replace placeholder with DHT values
+/**
+ * @brief Read temperature and humidity from DHT11 sensor
+ * @return String containing temperature and humidity separated by a space
+ */
+String computeData()
+{
+    Data d;
+    d.temperature    = dht.readTemperature();
+    d.humidity       = dht.readHumidity();
+    data[data_index] = d;
+    data_index++; // Cannot exceed UINT16_MAX, since data is a vector of size UINT16_MAX
+
+    return String(d.temperature) + " " + String(d.humidity);
+}
+
+/**
+ * @brief Replace placeholders in HTML file
+ * @param var placeholder to replace
+ * @return String containing the value to replace the placeholder
+ */
 String processor(const String &var)
 {
     if (var == "TEMPERATURE")
@@ -58,6 +97,12 @@ String processor(const String &var)
 
 void setup()
 {
+    // Initialize variables
+    unsigned char attempts  = 0;
+    bool led_on             = false;
+    data_index              = 0;  
+
+    // Initialize serial 
     Serial.begin(115200);
     pinMode(LED, OUTPUT);
 
@@ -73,8 +118,6 @@ void setup()
     delay(2000);
 
     // Connect to Wi-Fi
-    unsigned attempts = 0;
-    bool led_on       = false;
     WiFi.begin(SSID, PASSWORD);
     while (WiFi.status() != WL_CONNECTED)
     {
@@ -95,7 +138,7 @@ void setup()
     // Route for root / web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        request->send(SPIFFS, "/index.html", String(), false, processor); 
+        request->send(SPIFFS, "/index.html", String()); 
     });
 
     // Route for style.css file
@@ -109,23 +152,17 @@ void setup()
     {
         request->send(SPIFFS, "/function.js", "text/javascript"); 
     });
-
-    // Read temperature
-    server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        request->send(200, "text/plain", readDHTTemperature().c_str());
-    });
-
-    // Read humidity
-    server.on("/humidity", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        request->send(200, "text/plain", readDHTHumidity().c_str());
-    });
     
     // Print chart in another page
     server.on("/chart", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(SPIFFS, "/chart.html", String());
+    });
+
+    // Read temperature and humidity
+    server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "text/plain", computeData().c_str());
     });
 
     // Start server

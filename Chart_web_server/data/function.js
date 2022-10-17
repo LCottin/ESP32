@@ -51,7 +51,7 @@ var chartH = new Highcharts.Chart({
         type                 : 'datetime',
         dateTimeLabelFormats : { second : '%H:%M:%S' }
     },
-    yAxis  : 
+    yAxis : 
     {
         title : { text  : 'Humidity (%)' },
         min   : 0,
@@ -60,31 +60,29 @@ var chartH = new Highcharts.Chart({
     credits  : { enabled  : false }
 });
 
-setInterval(function () 
-{
+setInterval(function () {
     // Get the data and update the chart each time values are measured
     var xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function () 
     {
         if ((this.readyState == 4) && (this.status == 200)) 
         {
-            var x = (new Date()).getTime();
-            var temp = parseFloat(this.responseText.split(" ")[0]);
-            var humi = parseFloat(this.responseText.split(" ")[1]);
-            
-            if (chartT.series[0].data.length > 40) 
+            var TChart = [];
+            var HChart = [];
+            var lines  = this.responseText.split("\n");
+
+            for (var i = 0; i < lines.length; i++) 
             {
-                chartT.series[0].addPoint([x, temp], true, true, true);
-                chartH.series[0].addPoint([x, humi], true, true, true);
-            } 
-            else 
-            {
-                chartT.series[0].addPoint([x, temp], true, false, true);
-                chartH.series[0].addPoint([x, humi], true, false, true);
+                var line = lines[i].split(" ");
+                var time = parseInt(line[0]) * 1000;
+
+                TChart.push([time, parseFloat(line[1])]);
+                HChart.push([time, parseFloat(line[2])]);
             }
-        }
+            chartT.series[0].setData(TChart, true);
+            chartH.series[0].setData(HChart, true);
+        };
     };
     xhttp.open("GET", "/data", true);
     xhttp.send();
-
-}, 3000);
+}, 2000);

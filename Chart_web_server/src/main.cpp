@@ -3,13 +3,13 @@
 #include "ESPAsyncWebServer.h"
 #include "DHT.h"
 #include "CONFIGS.hpp"
-#include <vector>
+#include "NTPClient.h"
+#include "WiFiUdp.h"
 
-#define DHTPIN  14
-#define DHTTYPE DHT11
-#define LED     2
-
-using namespace std;
+#define DHTPIN   14
+#define DHTTYPE  DHT11
+#define LED      2
+#define MAX_DATA 10
 
 // Create DHT object
 DHT dht(DHTPIN, DHTTYPE);
@@ -17,82 +17,111 @@ DHT dht(DHTPIN, DHTTYPE);
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
+// Define NTP Client to get time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
+
 // Create struct to store sensor data
 typedef struct 
 {
+    unsigned long time;
     float temperature;
     float humidity;
 } Data;
-vector<Data> data(10);
-uint16_t data_index;
+Data data[MAX_DATA];
+static unsigned char data_size; // counter to store data
 
 /**
  * @brief Read temperature from DHT11 sensor
- * @return String containing temperature
  */
-String readDHTTemperature()
+float readDHTTemperature()
 {
     float t = dht.readTemperature();
     static float t_mem;
     if (isnan(t))
     {
         Serial.println("Failed to read temperature from DHT sensor ! Kept the old value");
-        return String(t_mem);
+        return t_mem;
     }
     t_mem = t;
     Serial.println("Read temperature : " + String(t) + "°C");
-    return String(t);
+    return t;
 }
 
 /**
  * @brief Read humidity from DHT11 sensor
- * @return String containing humidity
  */
-String readDHTHumidity()
+float readDHTHumidity()
 {
     float h = dht.readHumidity();
     static float h_mem;
     if (isnan(h))
     {
         Serial.println("Failed to read humidity from DHT sensor ! Kept the old value");
-        return String(h_mem);
+        return h_mem;
     }
     h_mem = h;
     Serial.println("Read humidity : " + String(h) + "°C");
-    return String(h);
+    return h;
+}
+
+/**
+ * @brief Read epoch from NTP server in milliseconds
+ */
+unsigned long readTime()
+{
+    timeClient.update();
+    return timeClient.getEpochTime();
 }
 
 /**
  * @brief Read temperature and humidity from DHT11 sensor
- * @return String containing temperature and humidity separated by a space
  */
-String computeData()
+void addDataToStruct()
 {
-    Data d;
-    d.temperature    = dht.readTemperature();
-    d.humidity       = dht.readHumidity();
-    data[data_index] = d;
-    data_index++; // Cannot exceed UINT16_MAX, since data is a vector of size UINT16_MAX
-
-    return String(d.temperature) + " " + String(d.humidity);
+    if (data_size == MAX_DATA)
+    {
+        memmove(data, data + 1, sizeof(data) - sizeof(data[0]));
+        data[MAX_DATA - 1].time        = readTime();
+        data[MAX_DATA - 1].temperature = readDHTTemperature();
+        data[MAX_DATA - 1].humidity    = readDHTHumidity();
+    }
+    else
+    {
+        data[data_size].time        = readTime();
+        data[data_size].temperature = readDHTTemperature();
+        data[data_size].humidity    = readDHTHumidity();
+        data_size++;
+    }
 }
 
 /**
- * @brief Replace placeholders in HTML file
- * @param var placeholder to replace
- * @return String containing the value to replace the placeholder
+ * @brief Convert the structure to a string where each data is separated by a space
  */
-String processor(const String &var)
+String convertStructToString()
 {
-    if (var == "TEMPERATURE")
+    String str = "";
+    for (int i = 0; i < data_size; i++)
     {
-        return readDHTTemperature();
+        str += String(data[i].time) + " " + String(data[i].temperature) + " " + String(data[i].humidity) + "\n";
     }
-    else if (var == "HUMIDITY")
+    Serial.println("Convert struct to string : \n" + str);
+    return str;
+}
+
+/**
+ * @brief Blink LED 5 times when esp32 is ready
+ */
+inline void blinkWhenReady()
+{
+    for (byte i = 0; i < 5; i++)
     {
-        return readDHTHumidity();
+        digitalWrite(LED, HIGH);
+        delay(100);
+        digitalWrite(LED, LOW);
+        delay(100);
     }
-    return String("--");
+    digitalWrite(LED, HIGH);
 }
 
 void setup()
@@ -100,7 +129,8 @@ void setup()
     // Initialize variables
     unsigned char attempts  = 0;
     bool led_on             = false;
-    data_index              = 0;  
+    data_size               = 0;
+    memset(&data[0], 0, sizeof(data));
 
     // Initialize serial 
     Serial.begin(115200);
@@ -115,7 +145,7 @@ void setup()
 
     // Initialize DHT sensor
     dht.begin();
-    delay(2000);
+    delay(1000);
 
     // Connect to Wi-Fi
     WiFi.begin(SSID, PASSWORD);
@@ -134,6 +164,11 @@ void setup()
 
     // Print ESP32 Local IP Address
     Serial.println(WiFi.localIP());
+
+    // Initialize NTP client
+    timeClient.begin();
+    timeClient.setTimeOffset(7200);
+    timeClient.setUpdateInterval(2000);
 
     // Route for root / web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -162,16 +197,18 @@ void setup()
     // Read temperature and humidity
     server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request)
     {
-        request->send(200, "text/plain", computeData().c_str());
+        request->send(200, "text/plain", convertStructToString().c_str());
     });
 
     // Start server
     server.begin();
 
     // Light the LED when connected
-    digitalWrite(LED, HIGH);
+    blinkWhenReady();
 }
 
 void loop()
 {
+    addDataToStruct();
+    delay(2000);
 }

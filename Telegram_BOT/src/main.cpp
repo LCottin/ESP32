@@ -43,9 +43,9 @@ void handleNewMessages(int numNewMessages)
     {
         // Chat id of the requester
         String chatID = String(bot.messages[i].chat_id);
-        if (chatID != chatID)
+        if ((chatID != CHAT_ID_1) && (chatID != CHAT_ID_2))
         {
-            bot.sendMessage(chatID, "Unauthorized user", "");
+            bot.sendMessage(chatID, "You are not authorized to use this bot.");
             continue;
         }
 

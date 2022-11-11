@@ -1,0 +1,58 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta name = "viewport" content = "width=device-width, initial-scale=1">
+    <script type = "text/javascript" src = "function.js"> </script>
+    <link rel = "stylesheet" href = "style.css">
+    <link rel = "stylesheet" href = "https://use.fontawesome.com/releases/v5.7.2/css/all.css">
+    <title> Sensor readings esp32 </title>
+</head>
+
+<body>
+    <h2> Current time </h2>
+    <p>
+        <i class="fas fa-light fa-clock" style = "color:#059e8a;"> </i>
+        <span id = "time"> </span>
+    </p>
+
+    <h2> DHT11 readings </h2>
+    <p>
+        <i class = "fas fa-thermometer-half" style = "color:#059e8a;"> </i>
+        Temperature in the room (from DHT11) =
+        <span id = "temperature_dht11" class = "container"> </span>
+        <sup class = "units"> &deg;C </sup>
+    </p>
+    <p>
+        <i class = "fas fa-tint" style = "color:#00add6;"> </i>
+        Humidity in the room (from DHT11) =
+        <span id = "humidity_dht11" class = "container"> </span>
+        <sup class = "units"> &percnt; </sup>
+    </p>
+
+    <h2> BME280 readings </h2>
+    <p>
+        <i class = "fas fa-thermometer-half" style = "color:#059e8a;"> </i>
+        Temperature in the room (from BME280) =
+        <span id = "temperature_bme280" class = "container"> </span>
+        <sup class = "units"> &deg;C </sup>
+    </p>
+
+    <p>
+        <i class = "fas fa-tint" style = "color:#00add6;"> </i>
+        Humidity in the room (from BME280) =
+        <span id = "humidity_bme280" class = "container"> </span>
+        <sup class = "units"> &percnt; </sup>
+    </p>
+
+    <p>
+        <i class="fas fa-thin fa-gauge-simple-high" style = "color:#00add6;"> </i>
+        Pressure in the room (from BME280) =
+        <span id = "pressure_bme280" class = "container"> </span>
+        <sup class = "units"> hPa </sup>
+    </p>
+
+    <script src = "function.js" > </script>
+</body>
+
+</html>

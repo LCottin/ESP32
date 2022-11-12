@@ -7,9 +7,10 @@
 #include "NTPClient.h"
 #include "WiFiUdp.h"
 
-#define DHTPIN   4
-#define DHTTYPE  DHT11
-#define LED      2
+#define DHTPIN               4
+#define DHTTYPE              DHT11
+#define LED                  2
+#define SEALEVELPRESSURE_HPA 1025.0F
 
 // Create DHT object
 DHT dht(DHTPIN, DHTTYPE);
@@ -40,6 +41,7 @@ typedef struct
         float temperature;
         float humidity;
         float pressure;
+        float altitude;
     } bme280;
 } Data;
 Data data;
@@ -120,6 +122,20 @@ float readBME280Pressure()
     return p;
 }
 
+float readBME280Altitude()
+{
+    float a = bme.readAltitude(SEALEVELPRESSURE_HPA);
+    static float a_mem;
+    if (isnan(a))
+    {
+        Serial.println("Failed to read altitude from BME280 sensor ! Kept the old value");
+        return a_mem;
+    }
+    a_mem = a;
+    Serial.println("Read altitude : " + String(a) + "m");
+    return a;
+}
+
 /**
  * @brief Read epoch from NTP server in milliseconds
  */
@@ -140,6 +156,7 @@ void updateData()
     data.bme280.temperature = readBME280Temperature();
     data.bme280.humidity    = readBME280Humidity();
     data.bme280.pressure    = readBME280Pressure();
+    data.bme280.altitude    = readBME280Altitude();
 }
 
 /**
@@ -160,6 +177,8 @@ String structToString()
     str += String(data.bme280.humidity);
     str += " ";
     str += String(data.bme280.pressure);
+    str += " ";
+    str += String(data.bme280.altitude);
     str += "\n";
 
     Serial.println("String to send : " + str);
@@ -178,7 +197,6 @@ inline void blinkWhenReady()
         digitalWrite(LED, LOW);
         delay(100);
     }
-    digitalWrite(LED, HIGH);
 }
 
 void setup()

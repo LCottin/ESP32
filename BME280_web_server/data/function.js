@@ -26,6 +26,7 @@ setInterval(function () {
             var Temperature_bme280  = parseFloat(data[3]);
             var Humidity_bme280     = parseFloat(data[4]);
             var Pressure_bme280     = parseFloat(data[5]);
+            var Altitude_bme280     = parseFloat(data[6]);
 
             // Update the data
             document.getElementById("time").innerHTML               = getTimeFromDate(time);
@@ -34,6 +35,7 @@ setInterval(function () {
             document.getElementById("temperature_bme280").innerHTML = Temperature_bme280;
             document.getElementById("humidity_bme280").innerHTML    = Humidity_bme280;
             document.getElementById("pressure_bme280").innerHTML    = Pressure_bme280;
+            document.getElementById("altitude_bme280").innerHTML    = Altitude_bme280;
         };
     };
     xhttp.open("GET", "/data", true);

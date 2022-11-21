@@ -1,230 +1,248 @@
 #include <Arduino.h>
-#include "SPIFFS.h"
-#include "CONFIGS.hpp"
-#include "ESP_Mail_Client.h"
-#include "esp_camera.h"
-#include "SPI.h"
-#include "driver/rtc_io.h"
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+#include "esp_camera.h"
+#include "CONFIGS.hpp"
+#include <UniversalTelegramBot.h>
 
-#define LED 4
+bool sendPhoto = false;
 
-#define CAMERA_MODEL_AI_THINKER
+WiFiClientSecure clientTCP;
+UniversalTelegramBot bot(BOT_TOKEN, clientTCP);
 
-#if defined(CAMERA_MODEL_AI_THINKER)
-  #define PWDN_GPIO_NUM     32
-  #define RESET_GPIO_NUM    -1
-  #define XCLK_GPIO_NUM      0
-  #define SIOD_GPIO_NUM     26
-  #define SIOC_GPIO_NUM     27
+#define FLASH_LED_PIN 4
+bool flashState = LOW;
+
+//Checks for new messages every 1 second.
+int botRequestDelay = 1000;
+unsigned long lastTimeBotRan;
+
+//CAMERA_MODEL_AI_THINKER
+#define PWDN_GPIO_NUM     32
+#define RESET_GPIO_NUM    -1
+#define XCLK_GPIO_NUM      0
+#define SIOD_GPIO_NUM     26
+#define SIOC_GPIO_NUM     27
+
+#define Y9_GPIO_NUM       35
+#define Y8_GPIO_NUM       34
+#define Y7_GPIO_NUM       39
+#define Y6_GPIO_NUM       36
+#define Y5_GPIO_NUM       21
+#define Y4_GPIO_NUM       19
+#define Y3_GPIO_NUM       18
+#define Y2_GPIO_NUM        5
+#define VSYNC_GPIO_NUM    25
+#define HREF_GPIO_NUM     23
+#define PCLK_GPIO_NUM     22
+
+
+void configInitCamera(){
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;
+  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;
+  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;
+  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;
+  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+  config.pin_sscb_sda = SIOD_GPIO_NUM;
+  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.pixel_format = PIXFORMAT_JPEG;
+
+  //init with high specs to pre-allocate larger buffers
+  if(psramFound()){
+    config.frame_size = FRAMESIZE_UXGA;
+    config.jpeg_quality = 10;  //0-63 lower number means higher quality
+    config.fb_count = 2;
+  } else {
+    config.frame_size = FRAMESIZE_SVGA;
+    config.jpeg_quality = 12;  //0-63 lower number means higher quality
+    config.fb_count = 1;
+  }
   
-  #define Y9_GPIO_NUM       35
-  #define Y8_GPIO_NUM       34
-  #define Y7_GPIO_NUM       39
-  #define Y6_GPIO_NUM       36
-  #define Y5_GPIO_NUM       21
-  #define Y4_GPIO_NUM       19
-  #define Y3_GPIO_NUM       18
-  #define Y2_GPIO_NUM        5
-  #define VSYNC_GPIO_NUM    25
-  #define HREF_GPIO_NUM     23
-  #define PCLK_GPIO_NUM     22
-  
-#else
-  #error "Camera model not selected"
-#endif
+  // camera init
+  esp_err_t err = esp_camera_init(&config);
+  if (err != ESP_OK) {
+    Serial.printf("Camera init failed with error 0x%x", err);
+    delay(1000);
+    ESP.restart();
+  }
 
-// Define smtp object
-SMTPSession      smtp;
-SMTP_Message     message;
-SMTP_Attachment  attachment;
-ESP_Mail_Session session;
+  // Drop down frame size for higher initial frame rate
+  sensor_t * s = esp_camera_sensor_get();
+  s->set_framesize(s, FRAMESIZE_CIF);  // UXGA|SXGA|XGA|SVGA|VGA|CIF|QVGA|HQVGA|QQVGA
+}
 
-// Define camera config
-static camera_config_t config;
+void handleNewMessages(int numNewMessages) {
+  Serial.print("Handle New Messages: ");
+  Serial.println(numNewMessages);
 
-/**
- * @brief Blink LED 5 times when esp32 is ready
- */
-inline void blinkWhenReady()
-{
-    for (byte i = 0; i < 5; i++)
-    {
-        digitalWrite(LED, HIGH);
-        delay(100);
-        digitalWrite(LED, LOW);
-        delay(100);
+  for (int i = 0; i < numNewMessages; i++) {
+    String chat_id = String(bot.messages[i].chat_id);
+    if (chat_id != CHAT_ID){
+      bot.sendMessage(chat_id, "Unauthorized user", "");
+      continue;
     }
-}
-
-camera_fb_t * capturePhoto() 
-{
-    Serial.println("Capturing photo...");
-
-    camera_fb_t *fb = nullptr;
-    do
-    {
-        fb = esp_camera_fb_get();
-        if (!fb)
-        {
-            Serial.println("Camera capture failed, retrying...");
-            delay(100);
-        }
-    } while (fb == nullptr);
-
-    Serial.println("Captured image.");
-    return fb;
-}
-
-void sendPhoto() 
-{
-    // Preparing email
-    Serial.println("Sending email...");
     
-    // set smtp server and port
-    smtp.debug(1);
-    session.server.host_name  = SMTP_SERVER;
-    session.server.port       = SMTP_PORT;
-    session.login.email       = SMTP_USER;
-    session.login.password    = SMTP_PASS;
-    session.login.user_domain = "";
-
-    if (smtp.connect(&session))
-    {
-        Serial.println("SMTP server connected.");
+    // Print the received message
+    String text = bot.messages[i].text;
+    Serial.println(text);
+    
+    String from_name = bot.messages[i].from_name;
+    if (text == "/start") {
+      String welcome = "Welcome , " + from_name + "\n";
+      welcome += "Use the following commands to interact with the ESP32-CAM \n";
+      welcome += "/photo : takes a new photo\n";
+      welcome += "/flash : toggles flash LED \n";
+      bot.sendMessage(CHAT_ID, welcome, "");
     }
-    else
-    {
-        Serial.println("SMTP server connection failed.");
-        esp_restart();
+    if (text == "/flash") {
+      flashState = !flashState;
+      digitalWrite(FLASH_LED_PIN, flashState);
+      Serial.println("Change flash LED state");
     }
-
-    // Attach photo to email
-    camera_fb_t *photo = capturePhoto();
-    attachment.blob.data = photo->buf;
-    attachment.blob.size = photo->len;
-
-    attachment.descr.name = "Photo";
-    attachment.descr.filename = "image/jpeg";
-    attachment.descr.mime = "image/jpeg";
-
-    // set message parameters
-    message.sender.name    = "ESP32";
-    message.sender.email   = SMTP_USER;
-    message.subject        = "ESP32 Mail Client Test";
-    message.addRecipient("Test", SMTP_DEST);
-    message.addAttachment(attachment);
-
-    // set message content
-    String content       = "Hello, this is a photo taken with esp32 cam.";
-    message.text.content = content.c_str();
-    message.text.charSet = "ascii";
-
-    // send message
-    if (MailClient.sendMail(&smtp, &message))
-    {
-        Serial.println("Message sent successfully");
+    if (text == "/photo") {
+      sendPhoto = true;
+      Serial.println("New photo request");
     }
-    else
-    {
-        Serial.println("Message sending failed : " + smtp.errorReason());
-        esp_restart();
-    }
+  }
 }
 
-void setup()
-{
-    //disable brownout detector
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
+String sendPhotoTelegram() {
+  const char* myDomain = "api.telegram.org";
+  String getAll = "";
+  String getBody = "";
 
-    // Initialize camera
-    config.ledc_channel     = LEDC_CHANNEL_0;
-    config.ledc_timer       = LEDC_TIMER_0;
-    config.pin_d0           = Y2_GPIO_NUM;
-    config.pin_d1           = Y3_GPIO_NUM;
-    config.pin_d2           = Y4_GPIO_NUM;
-    config.pin_d3           = Y5_GPIO_NUM;
-    config.pin_d4           = Y6_GPIO_NUM;
-    config.pin_d5           = Y7_GPIO_NUM;
-    config.pin_d6           = Y8_GPIO_NUM;
-    config.pin_d7           = Y9_GPIO_NUM;
-    config.pin_xclk         = XCLK_GPIO_NUM;
-    config.pin_pclk         = PCLK_GPIO_NUM;
-    config.pin_vsync        = VSYNC_GPIO_NUM;
-    config.pin_href         = HREF_GPIO_NUM;
-    config.pin_sscb_sda     = SIOD_GPIO_NUM;
-    config.pin_sscb_scl     = SIOC_GPIO_NUM;
-    config.pin_pwdn         = PWDN_GPIO_NUM;
-    config.pin_reset        = RESET_GPIO_NUM;
-    config.xclk_freq_hz     = 20000000;
-    config.pixel_format     = PIXFORMAT_JPEG;
-    config.fb_location      = CAMERA_FB_IN_DRAM;
-    config.frame_size       = FRAMESIZE_VGA;
+  camera_fb_t * fb = NULL;
+  fb = esp_camera_fb_get();  
+  if(!fb) {
+    Serial.println("Camera capture failed");
+    delay(1000);
+    ESP.restart();
+    return "Camera capture failed";
+  }  
+  
+  Serial.println("Connect to " + String(myDomain));
 
-    if (psramFound()) 
-    {
-        Serial.println("psram found");
-        config.jpeg_quality = 10;
-        config.fb_count = 2;
-    } 
-    else 
-    {
-        Serial.println("psram NOT found");
-        config.jpeg_quality = 12;
-        config.fb_count = 1;
+
+  if (clientTCP.connect(myDomain, 443)) {
+    Serial.println("Connection successful");
+    
+    String head = "--RandomNerdTutorials\r\nContent-Disposition: form-data; name=\"chat_id\"; \r\n\r\n" + CHAT_ID + "\r\n--RandomNerdTutorials\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"esp32-cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
+    String tail = "\r\n--RandomNerdTutorials--\r\n";
+
+    uint16_t imageLen = fb->len;
+    uint16_t extraLen = head.length() + tail.length();
+    uint16_t totalLen = imageLen + extraLen;
+  
+    clientTCP.println("POST /bot"+ String(BOT_TOKEN) +"/sendPhoto HTTP/1.1");
+    clientTCP.println("Host: " + String(myDomain));
+    clientTCP.println("Content-Length: " + String(totalLen));
+    clientTCP.println("Content-Type: multipart/form-data; boundary=RandomNerdTutorials");
+    clientTCP.println();
+    clientTCP.print(head);
+  
+    uint8_t *fbBuf = fb->buf;
+    size_t fbLen = fb->len;
+    for (size_t n=0;n<fbLen;n=n+1024) {
+      if (n+1024<fbLen) {
+        clientTCP.write(fbBuf, 1024);
+        fbBuf += 1024;
+      }
+      else if (fbLen%1024>0) {
+        size_t remainder = fbLen%1024;
+        clientTCP.write(fbBuf, remainder);
+      }
+    }  
+    
+    clientTCP.print(tail);
+    
+    esp_camera_fb_return(fb);
+    
+    int waitTime = 10000;   // timeout 10 seconds
+    long startTimer = millis();
+    boolean state = false;
+    
+    while ((startTimer + waitTime) > millis()){
+      Serial.print(".");
+      delay(100);      
+      while (clientTCP.available()) {
+        char c = clientTCP.read();
+        if (state==true) getBody += String(c);        
+        if (c == '\n') {
+          if (getAll.length()==0) state=true; 
+          getAll = "";
+        } 
+        else if (c != '\r')
+          getAll += String(c);
+        startTimer = millis();
+      }
+      if (getBody.length()>0) break;
     }
-    // Camera init
-    digitalWrite(PWDN_GPIO_NUM, LOW);
-    delay(10);
-    digitalWrite(PWDN_GPIO_NUM, HIGH);
-    delay(10);
-    esp_err_t err = esp_camera_init(&config);
-    if (!esp_camera_init(&config)) 
-    {
-        Serial.printf("Camera init failed.");
-        esp_restart();
-    }
-
-    // Initialize variables
-    unsigned char attempts  = 0;
-    bool led_on             = false;
-
-    // Initialize serial 
-    Serial.begin(115200);
-    pinMode(LED, OUTPUT);
-
-    // Initialize SPIFFS
-    // if (!SPIFFS.begin(true))
-    // {
-    //     Serial.println("An Error has occurred while mounting SPIFFS");
-    //     return;
-    // }
-
-    // Connect to Wi-Fi
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(1000);
-        Serial.println("Connecting to WiFi.. Attempt " + String(++attempts));
-        digitalWrite(LED, led_on);
-        led_on = !led_on;
-        if (attempts > 10)
-        {
-            Serial.println("Failed to connect to WiFi");
-            ESP.restart();
-        }
-    }
-
-    // Light the LED when connected
-    blinkWhenReady();
-
-    // Send email with photo
-    sendPhoto();
-
-    // Fix led when done
-    digitalWrite(LED, HIGH);
+    clientTCP.stop();
+    Serial.println(getBody);
+  }
+  else {
+    getBody="Connected to api.telegram.org failed.";
+    Serial.println("Connected to api.telegram.org failed.");
+  }
+  return getBody;
 }
 
-void loop()
-{
+void setup(){
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
+  // Init Serial Monitor
+  Serial.begin(115200);
+
+  // Set LED Flash as output
+  pinMode(FLASH_LED_PIN, OUTPUT);
+  digitalWrite(FLASH_LED_PIN, flashState);
+
+  // Config and init the camera
+  configInitCamera();
+
+  // Connect to Wi-Fi
+  WiFi.mode(WIFI_STA);
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(SSID);
+  WiFi.begin(SSID, PASSWORD);
+  clientTCP.setCACert(TELEGRAM_CERTIFICATE_ROOT); // Add root certificate for api.telegram.org
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println();
+  Serial.print("ESP32-CAM IP Address: ");
+  Serial.println(WiFi.localIP()); 
+}
+
+void loop() {
+  if (sendPhoto) {
+    Serial.println("Preparing photo");
+    sendPhotoTelegram(); 
+    sendPhoto = false; 
+  }
+  if (millis() > lastTimeBotRan + botRequestDelay)  {
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    while (numNewMessages) {
+      Serial.println("got response");
+      handleNewMessages(numNewMessages);
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    }
+    lastTimeBotRan = millis();
+  }
 }

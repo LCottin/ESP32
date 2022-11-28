@@ -8,12 +8,12 @@
 #include "WiFiUdp.h"
 
 #define LED                  2
-#define SEALEVELPRESSURE_HPA 1025.0F
-#define MY_ID                BEDROOM // ID of the room
+#define SEALEVELPRESSURE_HPA 1014.0F    // Sea level pressure in hPa
+#define TEMPERATURE_OFFSET   -2.0F      // offset to compensate the temperature sensor
+#define MY_ID                BEDROOM    // ID of the room
 
 // Mac address of the receiver and sender
-uint8_t senderAddress[]   = {0xC8, 0xF0, 0x9E, 0xA3, 0x52, 0xA8};
-uint8_t receiverAddress[] = {0xC8, 0xF0, 0x9E, 0xA3, 0x53, 0xCC};
+constexpr uint8_t receiverAddress[] = {0xC8, 0xF0, 0x9E, 0xA3, 0x52, 0xA8};
 
 // Stores id of the rooms
 enum ID 
@@ -44,25 +44,6 @@ NTPClient timeClient(ntpUDP);
 // Create struct for peer info
 esp_now_peer_info_t peerInfo;
 
-/**
- * @brief Get the Wi Fi Channel object
- */
-int32_t getWiFiChannel() 
-{
-    short networks = WiFi.scanNetworks();
-    if (networks > 0) 
-    {
-        for (int i = 0; i < networks; i++) 
-        {
-            if (WiFi.SSID(i) == WIFI_SSID)
-            {
-                return WiFi.channel(i);
-            }
-        }
-    }
-    return -1;
-}
-
 // callback when data is sent
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) 
 {
@@ -77,11 +58,11 @@ float readTemperature()
     if (isnan(t))
     {
         Serial.println("Failed to read temperature from BME280 sensor ! Kept the old value");
-        return t_mem;
+        return t_mem + TEMPERATURE_OFFSET;
     }
     t_mem = t;
-    Serial.println("Read temperature : " + String(t) + "°C");
-    return t;
+    Serial.println("Read temperature : " + String(t + TEMPERATURE_OFFSET) + "°C");
+    return t + TEMPERATURE_OFFSET;
 }
 
 float readHumidity()
@@ -146,6 +127,8 @@ void updateData()
     message.pressure    = readPressure();
     message.altitude    = readAltitude();
     message.time        = readTime();
+
+    Serial.println("Data updated");
 }
 
 /**
@@ -175,13 +158,32 @@ void setup()
     // Init Serial Monitor
     Serial.begin(115200);
 
-    // Set channel
-    esp_wifi_set_promiscuous(true);
-    esp_wifi_set_channel(getWiFiChannel(), WIFI_SECOND_CHAN_NONE);
-    esp_wifi_set_promiscuous(false);
+    // Init bme280 sensor
+    if (!bme.begin(0x76))
+    {
+        Serial.println("Could not find a valid BME280 sensor, check wiring!");
+        ESP.restart();
+    }
+
+    // Set device in STA mode to begin with
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.begin(WIFI_SSID, PASSWORD);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(1000);
+        Serial.println("Connecting to WiFi.. Attempt " + String(++attempts));
+        digitalWrite(LED, led_on);
+        led_on = !led_on;
+        if (attempts > 10)
+        {
+            Serial.println("Failed to connect to WiFi");
+            delay(2000);
+            ESP.restart();
+        }
+    }
     
     // Init ESP-NOW
-    if (esp_now_init() != ESP_OK) 
+    if (esp_now_init() != ESP_OK)
     {
         Serial.println("Error initializing ESP-NOW");
         delay(2000);
@@ -206,6 +208,7 @@ void setup()
     // Set LED pin as output
     pinMode(LED, OUTPUT);
     digitalWrite(LED, HIGH);
+    Serial.println(F("Sender ready"));
 }
  
 void loop() 

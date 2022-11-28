@@ -5,10 +5,6 @@
 
 #define LED                  2
 
-// Mac address of the receiver and sender
-uint8_t senderAddress[]   = {0xC8, 0xF0, 0x9E, 0xA3, 0x52, 0xA8};
-uint8_t receiverAddress[] = {0xC8, 0xF0, 0x9E, 0xA3, 0x53, 0xCC};
-
 // Stores id of the rooms
 enum ID 
 {
@@ -36,6 +32,8 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
     Message message;
     memcpy(&message, incomingData, sizeof(Message));
 
+    Serial.println("====================================");
+
     Serial.print("Received from : ");
     for (size_t i = 0; i < 6; i++)
     {
@@ -44,8 +42,7 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
             Serial.print(":");
     }
 
-    Serial.println("====================================");
-    Serial.print("Time : ");
+    Serial.print("\nTime : ");
     Serial.println(message.time);
     Serial.print("ID : ");
     Serial.println(idToString[message.id]);
@@ -74,20 +71,20 @@ void setup()
 
     // Set the device as a Station and Soft Access Point simultaneously
     WiFi.mode(WIFI_AP_STA);
-    WiFi.begin(SSID, PASSWORD);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(1000);
-        Serial.println("Connecting to WiFi.. Attempt " + String(++attempts));
-        digitalWrite(LED, led_on);
-        led_on = !led_on;
-        if (attempts > 10)
-        {
-            Serial.println("Failed to connect to WiFi");
-            delay(2000);
-            ESP.restart();
-        }
-    }
+    // WiFi.begin(SSID, PASSWORD);
+    // while (WiFi.status() != WL_CONNECTED)
+    // {
+    //     delay(1000);
+    //     Serial.println("Connecting to WiFi.. Attempt " + String(++attempts));
+    //     digitalWrite(LED, led_on);
+    //     led_on = !led_on;
+    //     if (attempts > 10)
+    //     {
+    //         Serial.println("Failed to connect to WiFi");
+    //         delay(2000);
+    //         ESP.restart();
+    //     }
+    // }
     
     // Init ESP-NOW
     if (esp_now_init() != ESP_OK) 
@@ -102,8 +99,10 @@ void setup()
     // Set LED pin as output
     pinMode(LED, OUTPUT);
     digitalWrite(LED, HIGH);
+    Serial.println("ESP-NOW Receiver ready on mac address : " + WiFi.macAddress());
 }
  
 void loop() 
 {
+    delay(100);
 }

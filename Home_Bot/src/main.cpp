@@ -3,14 +3,15 @@
 #include <UniversalTelegramBot.h> 
 #include "CONFIGS.hpp"
 #include <mutex>
-#include <esp_now.h>
 #include "Adafruit_BME680.h"
 #include "NTPClient.h"
 #include "WiFiUdp.h"
+#include "esp_now.h"
 
 #define LED                     2
 #define BOT_DELAY               500        // Milliseconds between updates of bot
-#define SENSOR_DELAY            1000       // Milliseconds between updates of sensors
+#define SENSOR_DELAY            2000       // Milliseconds between updates of sensors
+#define ESP_NOW_DELAY           1000       // Milliseconds between updates of ESP-NOW
 #define SEALEVELPRESSURE_HPA    1014.0F    // Sea level pressure in hPa
 #define TEMPERATURE_OFFSET      -2.0F      // offset to compensate the temperature sensor
 
@@ -27,13 +28,17 @@ SemaphoreHandle_t mtx;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 
+// Create BME680 object
+Adafruit_BME680 bme;
+
 // Stores id of the rooms
 enum ID 
 {
+    BEDROOM,
     LIVING_ROOM
 };
 
-// Message to receive
+// BME680 data
 typedef struct  
 {
     uint8_t id;
@@ -45,19 +50,45 @@ typedef struct
     unsigned long time;
 } Message_bme680;
 
+// BME280 data
+typedef struct  
+{
+    uint8_t id;
+    float temperature;
+    float humidity;
+    float pressure;
+    float altitude;
+    unsigned long time;
+} Message_bme280;
+
+// All data
+typedef struct  
+{
+    Message_bme680 bme680;
+    Message_bme280 bme280;
+} All_data;
+
+// ESP-NOW data
+typedef struct  
+{
+    bool received;
+    Message_bme280 bme280_tmp;
+} Incoming_data;
+
 // Create global variables
 bool ledState;
-Message_bme680 message;
-Adafruit_BME680 bme;
-const String rooms[] = {"Living room"};
+All_data all_data;
+volatile Incoming_data incoming_data;
+const String rooms[] = {"Bedroom", "Living room"};
 
+/* ============================================================= */
 
-/**
+/***********************************************************************
  * @brief Blink LED
  * @param nbBlink Number of blink (default 10)
  * @param delayBlink Delay between blink (default 100ms)
- */
-void blinkLED(uint8_t nbBlink = 10, uint8_t delayTime = 100)
+ ***********************************************************************/
+void blinkLED(const uint8_t nbBlink = 10, const uint8_t delayTime = 100)
 {
     for (uint8_t i = 0; i < nbBlink; i++)
     {
@@ -69,10 +100,10 @@ void blinkLED(uint8_t nbBlink = 10, uint8_t delayTime = 100)
 }
 
 
-/**
+/***********************************************************************
  * @brief Read temperature from BME680 sensor
  * @return Temperature in °C
- */
+ ***********************************************************************/
 float readBME680Temperature()
 {
     float t = bme.readTemperature();
@@ -87,10 +118,10 @@ float readBME680Temperature()
 }
 
 
-/**
+/***********************************************************************
  * @brief Read humidity from BME680 sensor
  * @return Humidity in %
- */
+ ***********************************************************************/
 float readBME680Humidity()
 {
     float h = bme.readHumidity();
@@ -105,10 +136,10 @@ float readBME680Humidity()
 }
 
 
-/**
+/***********************************************************************
  * @brief Read pressure from BME680 sensor
  * @return Pressure in hPa
- */
+ ***********************************************************************/
 float readBME680Pressure()
 {
     float p = bme.readPressure() / 100.0F;
@@ -123,10 +154,10 @@ float readBME680Pressure()
 }
 
 
-/**
+/***********************************************************************
  * @brief Read altitude from BME680 sensor
  * @return Altitude in meters
- */
+ ***********************************************************************/
 float readBME680Altitude()
 {
     float a = bme.readAltitude(SEALEVELPRESSURE_HPA);
@@ -141,10 +172,10 @@ float readBME680Altitude()
 }
 
 
-/**
+/***********************************************************************
  * @brief Read gas resistance from BME680 sensor
  * @return Gas resistance in kOhm
- */
+ ***********************************************************************/
 float readBME680GasResistance()
 {
     float r = bme.readGas() / 1000.0F;
@@ -159,9 +190,9 @@ float readBME680GasResistance()
 }
 
 
-/**
- * @brief Read epoch from NTP server in milliseconds
- */
+/***********************************************************************
+ * @brief Read epoch from NTP server in seconds
+ ***********************************************************************/
 unsigned long readTime()
 {
     timeClient.update();
@@ -169,46 +200,51 @@ unsigned long readTime()
 }
 
 
-/**
+/***********************************************************************
  * @brief Read all data from BME280 sensor
- */
-void updateData()
+ ***********************************************************************/
+void updateBME680Data()
 {
-    message.temperature     = readBME680Temperature();
-    message.humidity        = readBME680Humidity();
-    message.pressure        = readBME680Pressure();
-    message.altitude        = readBME680Altitude();
-    message.gas_resistance  = readBME680GasResistance();
-    message.time            = readTime();
+    all_data.bme680.temperature     = readBME680Temperature();
+    all_data.bme680.humidity        = readBME680Humidity();
+    all_data.bme680.pressure        = readBME680Pressure();
+    all_data.bme680.altitude        = readBME680Altitude();
+    all_data.bme680.gas_resistance  = readBME680GasResistance();
+    all_data.bme680.time            = readTime();
 }
 
 
-/**
+/***********************************************************************
  * @brief Convert struct to string
- * @param message Struct to convert
- * @return String
- */
-String structToString(Message_bme680 message)
+ * @return String with all data
+ ***********************************************************************/
+String structToString()
 {
-    String str = "";
-    str += "Time: " + String(message.time) + " s\n";
-    str += "ID: " + rooms[message.id] + "\n";
-    str += "Temperature: " + String(message.temperature) + " °C\n";
-    str += "Humidity: " + String(message.humidity) + " %\n";
-    str += "Pressure: " + String(message.pressure) + " hPa\n";
-    str += "Altitude: " + String(message.altitude) + " m\n";
-    str += "Gas resistance: " + String(message.gas_resistance) + " kOhm\n";
+    String str = "In living room:\n";
+    str += "\t\tTime: " + String(all_data.bme680.time) + " s\n";
+    str += "\t\tTemperature: " + String(all_data.bme680.temperature) + " °C\n";
+    str += "\t\tHumidity: " + String(all_data.bme680.humidity) + " %\n";
+    str += "\t\tPressure: " + String(all_data.bme680.pressure) + " hPa\n";
+    str += "\t\tAltitude: " + String(all_data.bme680.altitude) + " m\n";
+    str += "\t\tGas resistance: " + String(all_data.bme680.gas_resistance) + " kOhm\n\n";
+    
+    str += "In bedroom:\n";
+    str += "\t\tTime: " + String(all_data.bme280.time) + " s\n";
+    str += "\t\tTemperature: " + String(all_data.bme280.temperature) + " °C\n";
+    str += "\t\tHumidity: " + String(all_data.bme280.humidity) + " %\n";
+    str += "\t\tPressure: " + String(all_data.bme280.pressure) + " hPa\n";
+    str += "\t\tAltitude: " + String(all_data.bme280.altitude) + " m\n";
     return str;
 }
 
 
-/**
+/***********************************************************************
  * @brief Return welcome message
  * @param name Name to welcome
  * @param help Help message
  * @return Welcome message
- */
-String returnWelcomeMessage(String name, bool help = false)
+ ***********************************************************************/
+String returnWelcomeMessage(const String &name, bool help = false)
 {
     String welcome = "";
     if (help == false)
@@ -227,11 +263,11 @@ String returnWelcomeMessage(String name, bool help = false)
 }
 
 
-/**
+/***********************************************************************
  * @brief Randle what happens when you receive new messages
  * @param numNewMessages Number of new messages received
- */
-void handleNewMessages(int numNewMessages)
+ ***********************************************************************/
+void handleNewMessages(const int numNewMessages)
 {
     for (int i = 0; i < numNewMessages; i++)
     {
@@ -295,7 +331,7 @@ void handleNewMessages(int numNewMessages)
 
         else if (text == "/read_sensor")
         {
-            bot.sendMessage(chatID, structToString(message));
+            bot.sendMessage(chatID, structToString());
         }
 
         else
@@ -306,10 +342,10 @@ void handleNewMessages(int numNewMessages)
 }
 
 
-/**
+/***********************************************************************
  * @brief Task executed by Bot to send and receive messages to Telegram
  * @param pvParameters Task parameters
- */
+ ***********************************************************************/
 void botTask(void *pvParameters)
 {
     while (1)
@@ -320,9 +356,9 @@ void botTask(void *pvParameters)
             if (xSemaphoreTake(mtx, portMAX_DELAY))
             {
                 Serial.println("Bot task, got a message from Telegram.");
+                handleNewMessages(numNewMessages);
                 xSemaphoreGive(mtx);
             }
-            handleNewMessages(numNewMessages);
             numNewMessages = bot.getUpdates(bot.last_message_received + 1);
         }
 
@@ -332,10 +368,10 @@ void botTask(void *pvParameters)
 }
 
 
-/**
+/***********************************************************************
  * @brief Task executed by sensor to read data from BME680 sensor
  * @param pvParameters Task parameters
- */
+ ***********************************************************************/
 void sensorTask(void *pvParameters)
 {
     while (1)
@@ -344,7 +380,7 @@ void sensorTask(void *pvParameters)
         if (xSemaphoreTake(mtx, portMAX_DELAY))
         {
             Serial.println("Sensor task, reading data from BME680 sensor.");
-            updateData();
+            updateBME680Data();
             xSemaphoreGive(mtx);
         }
 
@@ -354,18 +390,55 @@ void sensorTask(void *pvParameters)
 }
 
 
-/**
+/***********************************************************************
+ * @brief Callback function to handle esp now reception
+ * @param mac_addr 
+ * @param incomingData 
+ * @param len 
+ ***********************************************************************/
+void receiveData(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
+{
+    incoming_data.received = true;
+    memcpy((void *)&incoming_data.bme280_tmp, incomingData, sizeof(Message_bme280));
+}
+
+
+/***********************************************************************
+ * @brief Task executed by esp now to send and receive data
+ * @param pvParameters Task parameters
+ ***********************************************************************/
+void espNowTask(void *pvParameters)
+{
+    while (1)
+    {
+        if (incoming_data.received)
+        {
+            if (xSemaphoreTake(mtx, portMAX_DELAY))
+            {
+                Serial.println("Esp now task, got data from esp now.");
+                memcpy(&all_data.bme280, (void *)&incoming_data.bme280_tmp, sizeof(Message_bme280));
+                xSemaphoreGive(mtx);
+                incoming_data.received = false;
+            }
+        }
+
+        // Wait for ESP_NOW_DELAY
+        vTaskDelay(ESP_NOW_DELAY / portTICK_PERIOD_MS);
+    }
+}
+
+
+/***********************************************************************
  * @brief Setup function
- */
+ ***********************************************************************/
 void setup() 
 {
     uint8_t attempts = 0;
     ledState         = false;
-    memset(&message, 0, sizeof(message));
+    memset(&all_data, 0, sizeof(All_data));
 
     // Initialize serial
     Serial.begin(115200);
-    Serial.println("Starting...");
 
     // Create a mutex
     mtx = xSemaphoreCreateMutex();
@@ -382,7 +455,7 @@ void setup()
     }
 
     // Connect to Wi-Fi
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(WIFI_AP_STA);
     WiFi.begin(SSID, PASSWORD);
     client.setCACert(TELEGRAM_CERTIFICATE_ROOT); 
     while (WiFi.status() != WL_CONNECTED)
@@ -403,15 +476,26 @@ void setup()
     timeClient.begin();
     timeClient.setTimeOffset(3600);
     timeClient.setUpdateInterval(1000);
+
+    // Initialize ESPNOW
+    if (esp_now_init() != ESP_OK)
+    {
+        Serial.println("Error initializing ESP-NOW");
+        ESP.restart();
+    }
+    esp_now_register_recv_cb(receiveData);
     
     // Start both tasks
-    xTaskCreatePinnedToCore(botTask, "botTask", 10000, NULL, 1, NULL, 0);
-    xTaskCreatePinnedToCore(sensorTask, "sensorTask", 10000, NULL, 1, NULL, 1);
+    Serial.println("Starting tasks...");
+    xTaskCreatePinnedToCore(botTask,       "botTask", 8192, NULL, 1, NULL, 0);
+    xTaskCreatePinnedToCore(sensorTask, "sensorTask", 4096, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(espNowTask, "espNowTask", 4096, NULL, 2, NULL, 1);
 }
 
-/**
+
+/***********************************************************************
  * @brief Loop function
- */
+ ***********************************************************************/
 void loop() 
 {
 }

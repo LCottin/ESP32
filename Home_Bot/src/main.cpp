@@ -7,6 +7,8 @@
 #include "NTPClient.h"
 #include "WiFiUdp.h"
 #include "esp_now.h"
+#include "SPIFFS.h"
+#include "ESPAsyncWebServer.h"
 
 #define LED                     2
 #define BOT_DELAY               500        // Milliseconds between updates of bot
@@ -30,6 +32,9 @@ NTPClient timeClient(ntpUDP);
 
 // Create BME680 object
 Adafruit_BME680 bme;
+
+// Create AsyncWebServer object on port 80
+AsyncWebServer server(80);
 
 // Stores id of the rooms
 enum ID 
@@ -216,24 +221,46 @@ void updateBME680Data()
 
 /***********************************************************************
  * @brief Convert struct to string
+ * @param web True if the string is for the web server, false if for the telegram bot (default false)
  * @return String with all data
  ***********************************************************************/
-String structToString()
+String structToString(const bool web = false)
 {
-    String str = "In living room:\n";
-    str += "\t\tTime: " + String(all_data.bme680.time) + " s\n";
-    str += "\t\tTemperature: " + String(all_data.bme680.temperature) + " °C\n";
-    str += "\t\tHumidity: " + String(all_data.bme680.humidity) + " %\n";
-    str += "\t\tPressure: " + String(all_data.bme680.pressure) + " hPa\n";
-    str += "\t\tAltitude: " + String(all_data.bme680.altitude) + " m\n";
-    str += "\t\tGas resistance: " + String(all_data.bme680.gas_resistance) + " kOhm\n\n";
-    
-    str += "In bedroom:\n";
-    str += "\t\tTime: " + String(all_data.bme280.time) + " s\n";
-    str += "\t\tTemperature: " + String(all_data.bme280.temperature) + " °C\n";
-    str += "\t\tHumidity: " + String(all_data.bme280.humidity) + " %\n";
-    str += "\t\tPressure: " + String(all_data.bme280.pressure) + " hPa\n";
-    str += "\t\tAltitude: " + String(all_data.bme280.altitude) + " m\n";
+    String str = "";
+    if (web)
+    {
+        str += rooms[all_data.bme680.id] + " ";    
+        str += String(all_data.bme680.time) + " ";
+        str += String(all_data.bme680.temperature) + " ";
+        str += String(all_data.bme680.humidity) + " ";
+        str += String(all_data.bme680.pressure) + " ";
+        str += String(all_data.bme680.altitude) + " ";
+        str += String(all_data.bme680.gas_resistance) + "\n";
+
+        str += rooms[all_data.bme280.id] + " ";
+        str += String(all_data.bme280.time) + " ";
+        str += String(all_data.bme280.temperature) + " ";
+        str += String(all_data.bme280.humidity) + " ";
+        str += String(all_data.bme280.pressure) + " ";
+        str += String(all_data.bme280.altitude) + " ";
+    }
+    else 
+    {
+        str += "In living room:\n";
+        str += "\t\tTime: " + String(all_data.bme680.time) + " s\n";
+        str += "\t\tTemperature: " + String(all_data.bme680.temperature) + " °C\n";
+        str += "\t\tHumidity: " + String(all_data.bme680.humidity) + " %\n";
+        str += "\t\tPressure: " + String(all_data.bme680.pressure) + " hPa\n";
+        str += "\t\tAltitude: " + String(all_data.bme680.altitude) + " m\n";
+        str += "\t\tGas resistance: " + String(all_data.bme680.gas_resistance) + " kOhm\n\n";
+        
+        str += "In bedroom:\n";
+        str += "\t\tTime: " + String(all_data.bme280.time) + " s\n";
+        str += "\t\tTemperature: " + String(all_data.bme280.temperature) + " °C\n";
+        str += "\t\tHumidity: " + String(all_data.bme280.humidity) + " %\n";
+        str += "\t\tPressure: " + String(all_data.bme280.pressure) + " hPa\n";
+        str += "\t\tAltitude: " + String(all_data.bme280.altitude) + " m\n";
+    }
     return str;
 }
 
@@ -454,6 +481,13 @@ void setup()
         ESP.restart();
     }
 
+    // INitialize SPIFFS
+    if (!SPIFFS.begin())
+    {
+        Serial.println("An Error has occurred while mounting SPIFFS");
+        ESP.restart();
+    }
+
     // Connect to Wi-Fi
     WiFi.mode(WIFI_AP_STA);
     WiFi.begin(SSID, PASSWORD);
@@ -484,6 +518,26 @@ void setup()
         ESP.restart();
     }
     esp_now_register_recv_cb(receiveData);
+
+    // Initialize web server
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/index.html");
+    });
+    server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/style.css", "text/css");
+    });
+    server.on("/function.js", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/function.js", "text/javascript");
+    });
+    server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "text/plain", structToString(true).c_str());
+    });
+
+    server.begin();
     
     // Start both tasks
     Serial.println("Starting tasks...");

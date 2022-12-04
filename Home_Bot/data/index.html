@@ -1,0 +1,97 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta name = "viewport" content = "width=device-width, initial-scale=1">
+    <script type = "text/javascript" src = "function.js"> </script>
+    <link rel = "stylesheet" href = "style.css">
+    <link rel = "stylesheet" href = "https://use.fontawesome.com/releases/v5.7.2/css/all.css">
+    <title> Sensor readings esp32 </title>
+</head>
+
+<body>
+    <section class="left_text">
+        <h2> Room : <span id="room0_id"></span> </h2>
+        <p>
+            <i class="fas fa-light fa-clock" style = "color:#059e8a;"> </i>
+            Time = 
+            <span id = "room0_time"> </span>
+        </p>
+    
+        <p>
+            <i class = "fas fa-thermometer-half" style = "color:#059e8a;"> </i>
+            Temperature in the room  =
+            <span id = "room0_temperature" class = "container"> </span>
+            <sup class = "units"> &deg;C </sup>
+        </p>
+    
+        <p>
+            <i class = "fas fa-tint" style = "color:#00add6;"> </i>
+            Humidity in the room =
+            <span id = "room0_humidity" class = "container"> </span>
+            <sup class = "units"> &percnt; </sup>
+        </p>
+    
+        <p>
+            <i class="fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
+            Pressure in the room =
+            <span id = "room0_pressure" class = "container"> </span>
+            <sup class = "units"> hPa </sup>
+        </p>
+    
+        <p>
+            <i class="fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
+            Altitude in the room =
+            <span id = "room0_altitude" class = "container"> </span>
+            <sup class = "units"> m </sup>
+        </p>
+    
+        <p>
+            <i class="fas fa-solid fa-biohazard" style = "color:#00add6;"></i>
+            Gas resistance in the room =
+            <span id = "room0_gas_resistance" class = "container"> </span>
+            <sup class = "units"> kOhm </sup>
+        </p>
+    </section>
+
+    <section class="right_text">
+        <h2> Room : <span id="room1_id"></span> </h2>
+        <p>
+            <i class="fas fa-light fa-clock" style = "color:#059e8a;"> </i>
+            Time = 
+            <span id = "room1_time"> </span>
+        </p>
+    
+        <p>
+            <i class = "fas fa-thermometer-half" style = "color:#059e8a;"> </i>
+            Temperature in the room  =
+            <span id = "room1_temperature" class = "container"> </span>
+            <sup class = "units"> &deg;C </sup>
+        </p>
+    
+        <p>
+            <i class = "fas fa-tint" style = "color:#00add6;"> </i>
+            Humidity in the room =
+            <span id = "room1_humidity" class = "container"> </span>
+            <sup class = "units"> &percnt; </sup>
+        </p>
+    
+        <p>
+            <i class="fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
+            Pressure in the room =
+            <span id = "room1_pressure" class = "container"> </span>
+            <sup class = "units"> hPa </sup>
+        </p>
+    
+        <p>
+            <i class="fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
+            Altitude in the room =
+            <span id = "room1_altitude" class = "container"> </span>
+            <sup class = "units"> m </sup>
+        </p>
+    </section>
+
+    <script src = "function.js" > </script>
+</body>
+
+</html>

@@ -13,18 +13,16 @@ h2
     text-align : center;
 }
 
-@media print 
+.left_text 
 {
-    .left_text 
-    {
-      column-count: 1;
-      -webkit-column-count: 1;
-      -moz-column-count: 1;
-    }
-    .right_text 
-    {
-      column-count: 2;
-      -webkit-column-count: 2;
-      -moz-column-count: 2;
-    }
-  }
+    float : left;
+    width: 50%;
+    text-align: center;
+}
+
+.right_text 
+{
+    float : right;
+    width : 50%;
+    text-align: center;
+}

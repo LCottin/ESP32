@@ -81,8 +81,8 @@ typedef struct
 } Incoming_data;
 
 // Create global variables
-bool ledState;
-All_data all_data;
+volatile bool ledState;
+volatile All_data all_data;
 volatile Incoming_data incoming_data;
 const String rooms[] = {"Bedroom", "Living room"};
 
@@ -113,7 +113,7 @@ float readBME680Temperature()
 {
     float t = bme.readTemperature();
     static float t_mem;
-    if (isnan(t))
+    if(isnan(t))
     {
         Serial.println("Failed to read temperature from BME680 sensor ! Kept the old value");
         return t_mem + TEMPERATURE_OFFSET;
@@ -131,7 +131,7 @@ float readBME680Humidity()
 {
     float h = bme.readHumidity();
     static float h_mem;
-    if (isnan(h))
+    if(isnan(h))
     {
         Serial.println("Failed to read humidity from BME680 sensor ! Kept the old value");
         return h_mem;
@@ -149,7 +149,7 @@ float readBME680Pressure()
 {
     float p = bme.readPressure() / 100.0F;
     static float p_mem;
-    if (isnan(p))
+    if(isnan(p))
     {
         Serial.println("Failed to read pressure from BME680 sensor ! Kept the old value");
         return p_mem;
@@ -167,7 +167,7 @@ float readBME680Altitude()
 {
     float a = bme.readAltitude(SEALEVELPRESSURE_HPA);
     static float a_mem;
-    if (isnan(a))
+    if(isnan(a))
     {
         Serial.println("Failed to read altitude from BME680 sensor ! Kept the old value");
         return a_mem;
@@ -185,7 +185,7 @@ float readBME680GasResistance()
 {
     float r = bme.readGas() / 1000.0F;
     static float r_mem;
-    if (isnan(r))
+    if(isnan(r))
     {
         Serial.println("Failed to read gas resistance from BME680 sensor ! Kept the old value");
         return r_mem;
@@ -227,22 +227,22 @@ void updateBME680Data()
 String structToString(const bool web = false)
 {
     String str = "";
-    if (web)
+    if(web)
     {
-        str += rooms[all_data.bme680.id] + " ";    
-        str += String(all_data.bme680.time) + " ";
-        str += String(all_data.bme680.temperature) + " ";
-        str += String(all_data.bme680.humidity) + " ";
-        str += String(all_data.bme680.pressure) + " ";
-        str += String(all_data.bme680.altitude) + " ";
+        str += rooms[all_data.bme680.id] + ";";    
+        str += String(all_data.bme680.time) + ";";
+        str += String(all_data.bme680.temperature) + ";";
+        str += String(all_data.bme680.humidity) + ";";
+        str += String(all_data.bme680.pressure) + ";";
+        str += String(all_data.bme680.altitude) + ";";
         str += String(all_data.bme680.gas_resistance) + "\n";
 
-        str += rooms[all_data.bme280.id] + " ";
-        str += String(all_data.bme280.time) + " ";
-        str += String(all_data.bme280.temperature) + " ";
-        str += String(all_data.bme280.humidity) + " ";
-        str += String(all_data.bme280.pressure) + " ";
-        str += String(all_data.bme280.altitude) + " ";
+        str += rooms[all_data.bme280.id] + ";";
+        str += String(all_data.bme280.time) + ";";
+        str += String(all_data.bme280.temperature) + ";";
+        str += String(all_data.bme280.humidity) + ";";
+        str += String(all_data.bme280.pressure) + ";";
+        str += String(all_data.bme280.altitude) + ";";
     }
     else 
     {
@@ -274,7 +274,7 @@ String structToString(const bool web = false)
 String returnWelcomeMessage(const String &name, bool help = false)
 {
     String welcome = "";
-    if (help == false)
+    if(help == false)
     {
         welcome += "Welcome, " + name + "!\n";
     }
@@ -300,7 +300,7 @@ void handleNewMessages(const int numNewMessages)
     {
         // Chat id of the requester
         String chatID = String(bot.messages[i].chat_id);
-        if ((chatID != CHAT_ID_1) && (chatID != CHAT_ID_2) && (chatID != CHAT_ID_GROUP))
+        if((chatID != CHAT_ID_1) && (chatID != CHAT_ID_2) && (chatID != CHAT_ID_GROUP))
         {
             bot.sendMessage(chatID, "You are not authorized to use this bot.");
             continue;
@@ -309,28 +309,28 @@ void handleNewMessages(const int numNewMessages)
         String text     = bot.messages[i].text;
         String fromName = bot.messages[i].from_name;
 
-        if (text == "/start")
+        if(text == "/start")
         {
             bot.sendMessage(chatID, returnWelcomeMessage(fromName));
         }
 
-        else if (text == "/led_on")
+        else if(text == "/led_on")
         {
             bot.sendMessage(chatID, "LED state set to ON");
             ledState = HIGH;
             digitalWrite(LED, ledState);
         }
 
-        else if (text == "/led_off")
+        else if(text == "/led_off")
         {
             bot.sendMessage(chatID, "LED state set to OFF");
             ledState = LOW;
             digitalWrite(LED, ledState);
         }
 
-        else if (text == "/state")
+        else if(text == "/state")
         {
-            if (ledState == true)
+            if(ledState == true)
             {
                 bot.sendMessage(chatID, "LED is ON");
             }
@@ -340,23 +340,23 @@ void handleNewMessages(const int numNewMessages)
             }
         }
 
-        else if (text == "/blink")
+        else if(text == "/blink")
         {
             bot.sendMessage(chatID, "LED will blink");
             blinkLED();
         }
 
-        else if (text == "/help")
+        else if(text == "/help")
         {
             bot.sendMessage(chatID, returnWelcomeMessage(fromName, true));
         }
 
-        else if (text == "/coreID")
+        else if(text == "/coreID")
         {
             bot.sendMessage(chatID, "This bot is running on core " + String(xPortGetCoreID()));
         }
 
-        else if (text == "/read_sensor")
+        else if(text == "/read_sensor")
         {
             bot.sendMessage(chatID, structToString());
         }
@@ -375,12 +375,12 @@ void handleNewMessages(const int numNewMessages)
  ***********************************************************************/
 void botTask(void *pvParameters)
 {
-    while (1)
+    while(true)
     {
         int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
-        while (numNewMessages)
+        while(numNewMessages)
         {
-            if (xSemaphoreTake(mtx, portMAX_DELAY))
+            if(xSemaphoreTake(mtx, portMAX_DELAY))
             {
                 Serial.println("Bot task, got a message from Telegram.");
                 handleNewMessages(numNewMessages);
@@ -401,10 +401,10 @@ void botTask(void *pvParameters)
  ***********************************************************************/
 void sensorTask(void *pvParameters)
 {
-    while (1)
+    while(true)
     {
         // Read data from BME680 sensor
-        if (xSemaphoreTake(mtx, portMAX_DELAY))
+        if(xSemaphoreTake(mtx, portMAX_DELAY))
         {
             Serial.println("Sensor task, reading data from BME680 sensor.");
             updateBME680Data();
@@ -436,14 +436,14 @@ void receiveData(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
  ***********************************************************************/
 void espNowTask(void *pvParameters)
 {
-    while (1)
+    while(true)
     {
-        if (incoming_data.received)
+        if(incoming_data.received)
         {
-            if (xSemaphoreTake(mtx, portMAX_DELAY))
+            if(xSemaphoreTake(mtx, portMAX_DELAY))
             {
                 Serial.println("Esp now task, got data from esp now.");
-                memcpy(&all_data.bme280, (void *)&incoming_data.bme280_tmp, sizeof(Message_bme280));
+                memcpy((void *)&all_data.bme280, (void *)&incoming_data.bme280_tmp, sizeof(Message_bme280));
                 xSemaphoreGive(mtx);
                 incoming_data.received = false;
             }
@@ -462,7 +462,8 @@ void setup()
 {
     uint8_t attempts = 0;
     ledState         = false;
-    memset(&all_data, 0, sizeof(All_data));
+    memset((void *)&all_data, 0, sizeof(All_data));
+    all_data.bme680.id = LIVING_ROOM;
 
     // Initialize serial
     Serial.begin(115200);
@@ -475,14 +476,14 @@ void setup()
     digitalWrite(LED, LOW);
 
     // Initialize BME680
-    if (!bme.begin())
+    if(!bme.begin())
     {
         Serial.println("Could not find a valid BME680 sensor, check wiring!");
         ESP.restart();
     }
 
-    // INitialize SPIFFS
-    if (!SPIFFS.begin())
+    // Initialize SPIFFS
+    if(!SPIFFS.begin())
     {
         Serial.println("An Error has occurred while mounting SPIFFS");
         ESP.restart();
@@ -492,18 +493,20 @@ void setup()
     WiFi.mode(WIFI_AP_STA);
     WiFi.begin(SSID, PASSWORD);
     client.setCACert(TELEGRAM_CERTIFICATE_ROOT); 
-    while (WiFi.status() != WL_CONNECTED)
+    while(WiFi.status() != WL_CONNECTED)
     {
         delay(500);
         Serial.println("Connecting to WiFi.. Attempt " + String(++attempts));
         digitalWrite(LED, ledState);
         ledState = !ledState;
-        if (attempts > 10)
+        if(attempts > 10)
         {
             Serial.println("Failed to connect to WiFi. Restarting... \n\n");
             ESP.restart();
         }
     }
+    ledState = false;
+    digitalWrite(LED, ledState);
     Serial.println(WiFi.localIP());
 
     // Initialize NTP client
@@ -512,7 +515,7 @@ void setup()
     timeClient.setUpdateInterval(1000);
 
     // Initialize ESPNOW
-    if (esp_now_init() != ESP_OK)
+    if(esp_now_init() != ESP_OK)
     {
         Serial.println("Error initializing ESP-NOW");
         ESP.restart();

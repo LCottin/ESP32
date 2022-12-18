@@ -158,6 +158,10 @@ void setup()
     // Init Serial Monitor
     Serial.begin(115200);
 
+    // Initialize LED
+    pinMode(LED, OUTPUT);
+    digitalWrite(LED, led_on);
+
     // Init bme280 sensor
     if (!bme.begin(0x76))
     {
@@ -181,6 +185,13 @@ void setup()
             ESP.restart();
         }
     }
+    led_on = false;
+    digitalWrite(LED, led_on);
+    Serial.println(WiFi.localIP());
+
+    // Initialize NTP client
+    timeClient.begin();
+    timeClient.setUpdateInterval(1000);
     
     // Init ESP-NOW
     if (esp_now_init() != ESP_OK)
@@ -205,9 +216,6 @@ void setup()
 
     esp_now_register_send_cb(OnDataSent);
 
-    // Set LED pin as output
-    pinMode(LED, OUTPUT);
-    digitalWrite(LED, HIGH);
     Serial.println(F("Sender ready"));
 }
  
@@ -219,6 +227,6 @@ void loop()
     // Send data
     sendData();
 
-    // Wait 2 seconds
-    delay(2000);
+    // Wait 1 seconds
+    delay(1000);
 }

@@ -11,7 +11,7 @@
 #include "ESPAsyncWebServer.h"
 
 #define LED                     2
-#define BOT_DELAY               500        // Milliseconds between updates of bot
+#define BOT_DELAY               800        // Milliseconds between updates of bot
 #define SENSOR_DELAY            1000       // Milliseconds between updates of sensors
 #define ESP_NOW_DELAY           1000       // Milliseconds between updates of ESP-NOW
 #define SEALEVELPRESSURE_HPA    1014.0F    // Sea level pressure in hPa

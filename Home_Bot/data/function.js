@@ -20,8 +20,8 @@ setInterval(function () {
         {
             // Get data from the server
             var data        = this.responseText.split('\n');
-            var living_room = data[0].split(' ');
-            var bedroom     = data[1].split(' ');
+            var living_room = data[0].split(';');
+            var bedroom     = data[1].split(';');
 
             // Update the data
             document.getElementById("room0_id").innerHTML             = living_room[0];

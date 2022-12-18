@@ -12,7 +12,7 @@
 
 #define LED                     2
 #define BOT_DELAY               500        // Milliseconds between updates of bot
-#define SENSOR_DELAY            2000       // Milliseconds between updates of sensors
+#define SENSOR_DELAY            1000       // Milliseconds between updates of sensors
 #define ESP_NOW_DELAY           1000       // Milliseconds between updates of ESP-NOW
 #define SEALEVELPRESSURE_HPA    1014.0F    // Sea level pressure in hPa
 #define TEMPERATURE_OFFSET      -2.0F      // offset to compensate the temperature sensor
@@ -40,7 +40,8 @@ AsyncWebServer server(80);
 enum ID 
 {
     BEDROOM,
-    LIVING_ROOM
+    LIVING_ROOM,
+    WATER_ROOM
 };
 
 // BME680 data
@@ -70,7 +71,7 @@ typedef struct
 typedef struct  
 {
     Message_bme680 bme680;
-    Message_bme280 bme280;
+    Message_bme280 bme280[2];
 } All_data;
 
 // ESP-NOW data
@@ -84,7 +85,7 @@ typedef struct
 volatile bool ledState;
 volatile All_data all_data;
 volatile Incoming_data incoming_data;
-const String rooms[] = {"Bedroom", "Living room"};
+const String rooms[] = {"Bedroom", "Living room", "Water room"};
 
 /* ============================================================= */
 
@@ -237,12 +238,15 @@ String structToString(const bool web = false)
         str += String(all_data.bme680.altitude) + ";";
         str += String(all_data.bme680.gas_resistance) + "\n";
 
-        str += rooms[all_data.bme280.id] + ";";
-        str += String(all_data.bme280.time) + ";";
-        str += String(all_data.bme280.temperature) + ";";
-        str += String(all_data.bme280.humidity) + ";";
-        str += String(all_data.bme280.pressure) + ";";
-        str += String(all_data.bme280.altitude) + ";";
+        for (uint8_t i = 0; i < 2; i++)
+        {
+            str += rooms[all_data.bme280[i].id] + ";";
+            str += String(all_data.bme280[i].time) + ";";
+            str += String(all_data.bme280[i].temperature) + ";";
+            str += String(all_data.bme280[i].humidity) + ";";
+            str += String(all_data.bme280[i].pressure) + ";";
+            str += String(all_data.bme280[i].altitude) + "\n";
+        }
     }
     else 
     {
@@ -254,12 +258,15 @@ String structToString(const bool web = false)
         str += "\t\tAltitude: " + String(all_data.bme680.altitude) + " m\n";
         str += "\t\tGas resistance: " + String(all_data.bme680.gas_resistance) + " kOhm\n\n";
         
-        str += "In bedroom:\n";
-        str += "\t\tTime: " + String(all_data.bme280.time) + " s\n";
-        str += "\t\tTemperature: " + String(all_data.bme280.temperature) + " °C\n";
-        str += "\t\tHumidity: " + String(all_data.bme280.humidity) + " %\n";
-        str += "\t\tPressure: " + String(all_data.bme280.pressure) + " hPa\n";
-        str += "\t\tAltitude: " + String(all_data.bme280.altitude) + " m\n";
+        for (uint8_t i = 0; i < 2; i++)
+        {
+            str += "In " + rooms[all_data.bme280[i].id] + "\n";
+            str += "\t\tTime: " + String(all_data.bme280[i].time) + " s\n";
+            str += "\t\tTemperature: " + String(all_data.bme280[i].temperature) + " °C\n";
+            str += "\t\tHumidity: " + String(all_data.bme280[i].humidity) + " %\n";
+            str += "\t\tPressure: " + String(all_data.bme280[i].pressure) + " hPa\n";
+            str += "\t\tAltitude: " + String(all_data.bme280[i].altitude) + " m\n\n";
+        }
     }
     return str;
 }
@@ -511,7 +518,6 @@ void setup()
 
     // Initialize NTP client
     timeClient.begin();
-    timeClient.setTimeOffset(3600);
     timeClient.setUpdateInterval(1000);
 
     // Initialize ESPNOW

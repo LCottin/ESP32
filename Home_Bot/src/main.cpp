@@ -545,10 +545,18 @@ void setup()
     {
         request->send(200, "text/plain", structToString(true).c_str());
     });
+    server.on("/living_room.html", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/living_room/living_room.html");
+    });
+    server.on("/living_room.js", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/living_room/living_room.js", "text/javascript");
+    });
 
     server.begin();
     
-    // Start both tasks
+    // Start tasks
     Serial.println("Starting tasks...");
     xTaskCreatePinnedToCore(botTask,       "botTask", 8192, NULL, 1, NULL, 0);
     xTaskCreatePinnedToCore(sensorTask, "sensorTask", 4096, NULL, 1, NULL, 1);

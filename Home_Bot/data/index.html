@@ -4,16 +4,17 @@
 <head>
     <meta name = "viewport" content = "width=device-width, initial-scale=1">
     <script type = "text/javascript" src = "function.js"> </script>
+    <script type = "text/javascript" src = "living_room.js"> </script>
     <link rel = "stylesheet" href = "style.css">
     <link rel = "stylesheet" href = "https://use.fontawesome.com/releases/v5.7.2/css/all.css">
     <title> Sensor readings esp32 </title>
 </head>
 
 <body>
-    <div class="left_text">
-        <h2> <span id="room0_id"></span> </h2>
+    <div class = "left_text">
+        <h2> Room : <span id = "room0_id"></span> </h2>
         <p>
-            <i class="fas fa-light fa-clock" style = "color:#059e8a;"> </i>
+            <i class = "fas fa-light fa-clock" style = "color:#059e8a;"> </i>
             Time = 
             <span id = "room0_time"> </span>
         </p>
@@ -33,31 +34,35 @@
         </p>
     
         <p>
-            <i class="fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
+            <i class = "fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
             Pressure =
             <span id = "room0_pressure" class = "container"> </span>
             <sup class = "units"> hPa </sup>
         </p>
     
         <p>
-            <i class="fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
+            <i class = "fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
             Altitude =
             <span id = "room0_altitude" class = "container"> </span>
             <sup class = "units"> m </sup>
         </p>
     
         <p>
-            <i class="fas fa-solid fa-biohazard" style = "color:#00add6;"></i>
+            <i class = "fas fa-solid fa-biohazard" style = "color:#00add6;"></i>
             Gas resistance =
             <span id = "room0_gas_resistance" class = "container"> </span>
             <sup class = "units"> kOhm </sup>
         </p>
+
+        <p>
+            Click <a href="living_room.html"> here </a> to see history of the <span id = "room0_id"></span>.
+        </p>
     </div>
 
-    <div class="center_text">
-        <h2> <span id="room1_id"></span> </h2>
+    <div class = "center_text">
+        <h2> Room : <span id = "room1_id"></span> </h2>
         <p>
-            <i class="fas fa-light fa-clock" style = "color:#059e8a;"> </i>
+            <i class = "fas fa-light fa-clock" style = "color:#059e8a;"> </i>
             Time = 
             <span id = "room1_time"> </span>
         </p>
@@ -77,35 +82,41 @@
         </p>
     
         <p>
-            <i class="fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
+            <i class = "fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
             Pressure =
             <span id = "room1_pressure" class = "container"> </span>
             <sup class = "units"> hPa </sup>
         </p>
     
         <p>
-            <i class="fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
+            <i class = "fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
             Altitude =
             <span id = "room1_altitude" class = "container"> </span>
             <sup class = "units"> m </sup>
         </p>
-    </div>
 
-    <div class="right_text">
-        <h2> <span id="room2_id"></span> </h2>
         <p>
-            <i class="fas fa-light fa-clock" style = "color:#059e8a;"> </i>
+            Click <a href="bedroom.html"> here </a> to see history of the <span id = "room2_id"></span>.
+        </p>
+        
+    </div>
+    
+    
+    <div class = "right_text">
+        <h2> Room : <span id = "room2_id"></span> </h2>
+        <p>
+            <i class = "fas fa-light fa-clock" style = "color:#059e8a;"> </i>
             Time = 
             <span id = "room2_time"> </span>
         </p>
-    
+        
         <p>
             <i class = "fas fa-thermometer-half" style = "color:#059e8a;"> </i>
             Temperature =
             <span id = "room2_temperature" class = "container"> </span>
             <sup class = "units"> &deg;C </sup>
         </p>
-    
+        
         <p>
             <i class = "fas fa-tint" style = "color:#00add6;"> </i>
             Humidity =
@@ -114,18 +125,23 @@
         </p>
     
         <p>
-            <i class="fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
+            <i class = "fas fa-regular fa-cloud" style = "color:#00add6;"> </i>
             Pressure =
             <span id = "room2_pressure" class = "container"> </span>
             <sup class = "units"> hPa </sup>
         </p>
-    
+        
         <p>
-            <i class="fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
+            <i class = "fas fa-regular fa-mountain" style = "color:#00add6;"> </i>     
             Altitude =
             <span id = "room2_altitude" class = "container"> </span>
             <sup class = "units"> m </sup>
         </p>
+
+        <p>
+            Click <a href="bathroom.html"> here </a> to see history of the <span id = "room2_id"></span>.
+        </p>
+
     </div>
 
     <script src = "function.js" > </script>

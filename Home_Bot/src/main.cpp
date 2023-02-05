@@ -16,6 +16,7 @@
 #define ESP_NOW_DELAY           1000       // Milliseconds between updates of ESP-NOW
 #define SEALEVELPRESSURE_HPA    1014.0F    // Sea level pressure in hPa
 #define TEMPERATURE_OFFSET      -2.0F      // offset to compensate the temperature sensor
+#define MAX_DATA                10         // Max number of data to store
 
 using namespace std;
 
@@ -39,9 +40,9 @@ AsyncWebServer server(80);
 // Stores id of the rooms
 enum ID 
 {
-    BEDROOM,
     LIVING_ROOM,
-    WATER_ROOM
+    BEDROOM,
+    BATHROOM
 };
 
 // BME680 data
@@ -53,7 +54,7 @@ typedef struct
     float pressure;
     float altitude;
     float gas_resistance;
-    unsigned long time;
+    uint32_t time;
 } Message_bme680;
 
 // BME280 data
@@ -64,15 +65,29 @@ typedef struct
     float humidity;
     float pressure;
     float altitude;
-    unsigned long time;
+    uint32_t time;
 } Message_bme280;
 
-// All data
-typedef struct  
+// Data for living room
+typedef struct
 {
-    Message_bme680 bme680;
-    Message_bme280 bme280[2];
-} All_data;
+    uint8_t count;
+    Message_bme680 data[MAX_DATA];
+} Data_living_room;
+
+// Data for bathroom
+typedef struct
+{
+    uint8_t count;
+    Message_bme280 data[MAX_DATA];
+} Data_bathroom;
+
+// Data for bedroom
+typedef struct
+{
+    uint8_t count;
+    Message_bme280 data[MAX_DATA];
+} Data_bedroom;
 
 // ESP-NOW data
 typedef struct  
@@ -82,19 +97,26 @@ typedef struct
 } Incoming_data;
 
 // Create global variables
-volatile bool ledState;
-volatile All_data all_data;
-volatile Incoming_data incoming_data;
-const String rooms[] = {"Bedroom", "Living room", "Water room"};
+volatile bool             ledState;
+volatile Incoming_data    incoming_data;
+volatile Data_living_room data_living_room;
+volatile Data_bathroom    data_bathroom;
+volatile Data_bedroom     data_bedroom;
+const String rooms[] = 
+{
+    "Living room", 
+    "Bedroom", 
+    "Bathroom"
+};
 
-/* ============================================================= */
+/* =================================================================== */
 
 /***********************************************************************
  * @brief Blink LED
  * @param nbBlink Number of blink (default 10)
  * @param delayBlink Delay between blink (default 100ms)
  ***********************************************************************/
-void blinkLED(const uint8_t nbBlink = 10, const uint8_t delayTime = 100)
+inline void blinkLED(const uint8_t nbBlink = 10, const uint8_t delayTime = 100)
 {
     for (uint8_t i = 0; i < nbBlink; i++)
     {
@@ -199,7 +221,7 @@ float readBME680GasResistance()
 /***********************************************************************
  * @brief Read epoch from NTP server in seconds
  ***********************************************************************/
-unsigned long readTime()
+uint32_t readTime()
 {
     timeClient.update();
     return timeClient.getEpochTime();
@@ -207,66 +229,114 @@ unsigned long readTime()
 
 
 /***********************************************************************
- * @brief Read all data from BME280 sensor
+ * @brief Read all data from BME280 sensor and store it in all_data
  ***********************************************************************/
 void updateBME680Data()
 {
-    all_data.bme680.temperature     = readBME680Temperature();
-    all_data.bme680.humidity        = readBME680Humidity();
-    all_data.bme680.pressure        = readBME680Pressure();
-    all_data.bme680.altitude        = readBME680Altitude();
-    all_data.bme680.gas_resistance  = readBME680GasResistance();
-    all_data.bme680.time            = readTime();
+    uint8_t idx;
+
+    if (data_living_room.count == MAX_DATA)
+    {
+        // Shift data
+        for (uint8_t i = 0; i < MAX_DATA - 1; i++)
+        {
+            memcpy((void *)&data_living_room.data[i], (void *)&data_living_room.data[i + 1], sizeof(data_living_room.data[0]));
+        }
+        idx = MAX_DATA - 1;
+    }
+    else if (data_living_room.count == 0)
+    {
+        idx = 0;
+        data_living_room.count++;
+    }
+    else
+    {
+        idx = data_living_room.count - 1;
+        data_living_room.count++;
+    }
+    
+    data_living_room.data[idx].time           = readTime();
+    data_living_room.data[idx].temperature    = readBME680Temperature();
+    data_living_room.data[idx].humidity       = readBME680Humidity();
+    data_living_room.data[idx].pressure       = readBME680Pressure();
+    data_living_room.data[idx].altitude       = readBME680Altitude();
+    data_living_room.data[idx].gas_resistance = readBME680GasResistance();
 }
 
 
 /***********************************************************************
  * @brief Convert struct to string
- * @param web True if the string is for the web server, false if for the telegram bot (default false)
- * @return String with all data
+ * @param lastOnly True if only the value of the last data is needed, false if all data is needed (default false)
+ * @return String with all data, separated by ',' for each label, ";" for each data and '\n' for each room
  ***********************************************************************/
-String structToString(const bool web = false)
+String structToString(const bool lastOnly = false)
 {
     String str = "";
-    if(web)
+    if(lastOnly == false)
     {
-        str += rooms[all_data.bme680.id] + ";";    
-        str += String(all_data.bme680.time) + ";";
-        str += String(all_data.bme680.temperature) + ";";
-        str += String(all_data.bme680.humidity) + ";";
-        str += String(all_data.bme680.pressure) + ";";
-        str += String(all_data.bme680.altitude) + ";";
-        str += String(all_data.bme680.gas_resistance) + "\n";
-
-        for (uint8_t i = 0; i < 2; i++)
+        // Convert living room data
+        for (uint8_t i = 0; i < data_living_room.count; i++)
         {
-            str += rooms[all_data.bme280[i].id] + ";";
-            str += String(all_data.bme280[i].time) + ";";
-            str += String(all_data.bme280[i].temperature) + ";";
-            str += String(all_data.bme280[i].humidity) + ";";
-            str += String(all_data.bme280[i].pressure) + ";";
-            str += String(all_data.bme280[i].altitude) + "\n";
+            str += rooms[data_living_room.data[i].id]+ ",";
+            str += String(data_living_room.data[i].time) + ",";
+            str += String(data_living_room.data[i].temperature) + ",";
+            str += String(data_living_room.data[i].humidity) + ",";
+            str += String(data_living_room.data[i].pressure) + ",";
+            str += String(data_living_room.data[i].altitude) + ",";
+            str += String(data_living_room.data[i].gas_resistance) + ";";
+        }
+        str += "\n";
+
+        // Convert bedroom data
+        for (uint8_t i = 0; i < data_bedroom.count; i++)
+        {
+            str += rooms[data_bedroom.data[i].id]+ ",";
+            str += String(data_bedroom.data[i].time) + ",";
+            str += String(data_bedroom.data[i].temperature) + ",";
+            str += String(data_bedroom.data[i].humidity) + ",";
+            str += String(data_bedroom.data[i].pressure) + ",";
+            str += String(data_bedroom.data[i].altitude) + ";";
+        }
+        str += "\n";
+
+        // Convert bathroom data
+        for (uint8_t i = 0; i < data_bathroom.count; i++)
+        {
+            str += rooms[data_bathroom.data[i].id]+ ",";
+            str += String(data_bathroom.data[i].time) + ",";
+            str += String(data_bathroom.data[i].temperature) + ",";
+            str += String(data_bathroom.data[i].humidity) + ",";
+            str += String(data_bathroom.data[i].pressure) + ",";
+            str += String(data_bathroom.data[i].altitude) + ";";
         }
     }
     else 
     {
+        const uint8_t lastIdx_living_room = (data_living_room.count == 0) ? 0 : data_living_room.count - 1;
+        const uint8_t lastIdx_bedroom     = (data_bedroom.count == 0)     ? 0 : data_bedroom.count - 1;
+        const uint8_t lastIdx_bathroom    = (data_bathroom.count == 0)    ? 0 : data_bathroom.count - 1;
+
         str += "In living room:\n";
-        str += "\t\tTime: " + String(all_data.bme680.time) + " s\n";
-        str += "\t\tTemperature: " + String(all_data.bme680.temperature) + " °C\n";
-        str += "\t\tHumidity: " + String(all_data.bme680.humidity) + " %\n";
-        str += "\t\tPressure: " + String(all_data.bme680.pressure) + " hPa\n";
-        str += "\t\tAltitude: " + String(all_data.bme680.altitude) + " m\n";
-        str += "\t\tGas resistance: " + String(all_data.bme680.gas_resistance) + " kOhm\n\n";
-        
-        for (uint8_t i = 0; i < 2; i++)
-        {
-            str += "In " + rooms[all_data.bme280[i].id] + "\n";
-            str += "\t\tTime: " + String(all_data.bme280[i].time) + " s\n";
-            str += "\t\tTemperature: " + String(all_data.bme280[i].temperature) + " °C\n";
-            str += "\t\tHumidity: " + String(all_data.bme280[i].humidity) + " %\n";
-            str += "\t\tPressure: " + String(all_data.bme280[i].pressure) + " hPa\n";
-            str += "\t\tAltitude: " + String(all_data.bme280[i].altitude) + " m\n\n";
-        }
+        str += "\t\tTime: " + String(data_living_room.data[lastIdx_living_room].time) + ";";
+        str += "\t\tTemperature: " + String(data_living_room.data[lastIdx_living_room].temperature) + ";";
+        str += "\t\tHumidity: " + String(data_living_room.data[lastIdx_living_room].humidity) + ";";
+        str += "\t\tPressure: " + String(data_living_room.data[lastIdx_living_room].pressure) + ";";
+        str += "\t\tAltitude: " + String(data_living_room.data[lastIdx_living_room].altitude) + ";";
+        str += "\t\tGas resistance: " + String(data_living_room.data[lastIdx_living_room].gas_resistance) + "\n";
+
+        str += "In bedroom:\n";
+        str += "\t\tTime: " + String(data_bedroom.data[lastIdx_bedroom].time) + ";";
+        str += "\t\tTemperature: " + String(data_bedroom.data[lastIdx_bedroom].temperature) + ";";
+        str += "\t\tHumidity: " + String(data_bedroom.data[lastIdx_bedroom].humidity) + ";";
+        str += "\t\tPressure: " + String(data_bedroom.data[lastIdx_bedroom].pressure) + ";";
+        str += "\t\tAltitude: " + String(data_bedroom.data[lastIdx_bedroom].altitude) + "\n";
+
+        str += "In bathroom:\n";
+        str += "\t\tTime: " + String(data_bathroom.data[lastIdx_bathroom].time) + ";";
+        str += "\t\tTemperature: " + String(data_bathroom.data[lastIdx_bathroom].temperature) + ";";
+        str += "\t\tHumidity: " + String(data_bathroom.data[lastIdx_bathroom].humidity) + ";";
+        str += "\t\tPressure: " + String(data_bathroom.data[lastIdx_bathroom].pressure) + ";";
+        str += "\t\tAltitude: " + String(data_bathroom.data[lastIdx_bathroom].altitude) + "\n";
     }
     return str;
 }
@@ -301,9 +371,9 @@ String returnWelcomeMessage(const String &name, bool help = false)
  * @brief Randle what happens when you receive new messages
  * @param numNewMessages Number of new messages received
  ***********************************************************************/
-void handleNewMessages(const int numNewMessages)
+void handleNewMessages(const int32_t numNewMessages)
 {
-    for (int i = 0; i < numNewMessages; i++)
+    for (int32_t i = 0; i < numNewMessages; i++)
     {
         // Chat id of the requester
         String chatID = String(bot.messages[i].chat_id);
@@ -365,7 +435,7 @@ void handleNewMessages(const int numNewMessages)
 
         else if(text == "/read_sensor")
         {
-            bot.sendMessage(chatID, structToString());
+            bot.sendMessage(chatID, structToString(true));
         }
 
         else
@@ -384,7 +454,7 @@ void botTask(void *pvParameters)
 {
     while(true)
     {
-        int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+        int32_t numNewMessages = bot.getUpdates(bot.last_message_received + 1);
         while(numNewMessages)
         {
             if(xSemaphoreTake(mtx, portMAX_DELAY))
@@ -430,10 +500,10 @@ void sensorTask(void *pvParameters)
  * @param incomingData 
  * @param len 
  ***********************************************************************/
-void receiveData(const uint8_t *mac_addr, const uint8_t *incomingData, int len)
+void receiveData(const uint8_t *mac_addr, const uint8_t *incomingData, int32_t len)
 {
-    incoming_data.received = true;
     memcpy((void *)&incoming_data.bme280_tmp, incomingData, sizeof(Message_bme280));
+    incoming_data.received = true;
 }
 
 
@@ -449,10 +519,25 @@ void espNowTask(void *pvParameters)
         {
             if(xSemaphoreTake(mtx, portMAX_DELAY))
             {
+                /* Make sure IDs are the same on the emittor side */
                 Serial.println("Esp now task, got data from esp now.");
-                memcpy((void *)&all_data.bme280, (void *)&incoming_data.bme280_tmp, sizeof(Message_bme280));
-                xSemaphoreGive(mtx);
+                if (incoming_data.bme280_tmp.id == BEDROOM)
+                {
+                    memcpy((void *)&data_bedroom.data, (void *)&incoming_data.bme280_tmp, sizeof(Message_bme280));
+                    data_bedroom.count++;
+                }
+                else if (incoming_data.bme280_tmp.id == BATHROOM)
+                {
+                    memcpy((void *)&data_bathroom.data, (void *)&incoming_data.bme280_tmp, sizeof(Message_bme280));
+                    data_bathroom.count++;
+                }
+                else
+                {
+                    Serial.println("Esp now task, invalid id received.");
+                }
+
                 incoming_data.received = false;
+                xSemaphoreGive(mtx);
             }
         }
 
@@ -469,8 +554,14 @@ void setup()
 {
     uint8_t attempts = 0;
     ledState         = false;
-    memset((void *)&all_data, 0, sizeof(All_data));
-    all_data.bme680.id = LIVING_ROOM;
+    memset((void *)&incoming_data,    0, sizeof(incoming_data));
+    memset((void *)&data_bedroom,     0, sizeof(data_bedroom));
+    memset((void *)&data_bathroom,    0, sizeof(data_bathroom));
+    memset((void *)&data_living_room, 0, sizeof(data_living_room));
+    for (uint8_t i = 0; i < MAX_DATA; i++)
+    {
+        data_living_room.data[i].id = LIVING_ROOM;
+    }
 
     // Initialize serial
     Serial.begin(115200);
@@ -541,14 +632,34 @@ void setup()
     {
         request->send(SPIFFS, "/function.js", "text/javascript");
     });
-    server.on("/data", HTTP_GET, [](AsyncWebServerRequest *request)
+    server.on("/all_data", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(200, "text/plain", structToString(false).c_str());
+    });
+    server.on("/last_data", HTTP_GET, [](AsyncWebServerRequest *request)
     {
         request->send(200, "text/plain", structToString(true).c_str());
+    });
+    server.on("/living_room.html", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/living_room/living_room.html");
+    });
+    server.on("/living_room.js", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/living_room/living_room.js", "text/javascript");
+    });
+    server.on("/bedroom.html", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/bedroom/bedroom.html");
+    });
+    server.on("/bedroom.js", HTTP_GET, [](AsyncWebServerRequest *request)
+    {
+        request->send(SPIFFS, "/bedroom/bedroom.js", "text/javascript");
     });
 
     server.begin();
     
-    // Start both tasks
+    // Start tasks
     Serial.println("Starting tasks...");
     xTaskCreatePinnedToCore(botTask,       "botTask", 8192, NULL, 1, NULL, 0);
     xTaskCreatePinnedToCore(sensorTask, "sensorTask", 4096, NULL, 1, NULL, 1);

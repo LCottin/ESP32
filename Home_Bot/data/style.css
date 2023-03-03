@@ -1,28 +1,65 @@
 body 
 {
-    min-width : 310px;
-    max-width : 800px;
-    height : 400px;
-    margin : 0 auto;
+    font-family: Arial, sans-serif;
 }
 
-h2 
+.container 
 {
-    font-family : Arial;
-    font-size : 2.5rem;
-    text-align : center;
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-.center_text, .left_text, .right_text
+.weather 
 {
-    width : 33%;
-    height : 100%;
-    text-align: center;
-    float : left;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    box-sizing: border-box;
+}
+.icon 
+{
+    margin-right: 20px;
+    width: 60px;
+    height: 60px;
 }
 
-.chart-temperature, .chart-humidity, .chart-pressure
+.data 
 {
-    width : 100%;
-    height : 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.value 
+{
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.label 
+{
+    font-size: 16px;
+    color: #666;
+}
+
+@media only screen and (max-width: 600px) 
+{
+    .container 
+    {
+        padding: 10px;
+    }
+    .weather 
+    {
+        flex-direction: column;
+    }
 }

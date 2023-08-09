@@ -6,6 +6,12 @@
 #include "NTPClient.h"
 #include "WiFiUdp.h"
 
+// Define verbose
+#define VERBOSE 0
+
+// Define delay between each emission
+#define DELAY_BETWEEN_EMISSION_MS 5000
+
 // Define sea level pressure
 #define SEALEVELPRESSURE_HPA 1013.0F
 
@@ -51,7 +57,9 @@ float readBME680Temperature()
         return t_mem;
     }
     t_mem = t;
-    // Serial.println("Read temperature : " + String(t) + "°C");
+#if VERBOSE
+    Serial.println("Read temperature : " + String(t) + "°C");
+#endif
     return t;
 }
 
@@ -68,7 +76,9 @@ float readBME680Humidity()
         return h_mem;
     }
     h_mem = h;
-    // Serial.println("Read humidity : " + String(h) + "°C");
+#if VERBOSE
+    Serial.println("Read humidity : " + String(h) + "°C");
+#endif
     return h;
 }
 
@@ -85,7 +95,9 @@ float readBME680Pressure()
         return p_mem;
     }
     p_mem = p;
-    // Serial.println("Read pressure : " + String(p) + "hPa");
+#if VERBOSE
+    Serial.println("Read pressure : " + String(p) + "hPa");
+#endif
     return p;
 }
 
@@ -102,7 +114,9 @@ float readBME680Altitude()
         return a_mem;
     }
     a_mem = a;
-    // Serial.println("Read altitude : " + String(a) + "m");
+#if VERBOSE
+    Serial.println("Read altitude : " + String(a) + "m");
+#endif
     return a;
 }
 
@@ -119,7 +133,9 @@ float readBME680GasResistance()
         return r_mem;
     }
     r_mem = r;
-    // Serial.println("Read gas resistance : " + String(r) + "kOhm");
+#if VERBOSE
+    Serial.println("Read gas resistance : " + String(r) + "kOhm");
+#endif
     return r;
 }
 
@@ -184,11 +200,15 @@ void reconnect()
     // Loop until we're reconnected
     while (!client.connected())
     {
+#if VERBOSE
         Serial.print("Attempting MQTT connection...");
+#endif
         // Attempt to connect
         if (client.connect("ESP32client"))
         {
+#if VERBOSE
             Serial.println("connected");
+#endif
             // Subscribe
             client.subscribe("test_channel");
         }
@@ -213,26 +233,27 @@ void loop()
     client.loop();
 
     unsigned long now = millis();
-    if (millis() - lastMsg > 5000)
+    if (millis() - lastMsg > DELAY_BETWEEN_EMISSION_MS)
     {
         lastMsg = now;
 
         updateData();
 
+#if VERBOSE
         Serial.println("Sending message to MQTT Server...");
-        
-        // Fill json string to send with value from struct
-        char json[128] = "";
-        strncat(json, "{\"time\" : ", 12);
-        strncat(json, String(data.time).c_str(), strlen(String(data.time).c_str()));
-        strncat(json, ", \"temperature\" : ", 20);
-        strncat(json, String(data.temperature).c_str(), strlen(String(data.temperature).c_str()));
-        strncat(json, ", \"humidity\" : ", 17);
-        strncat(json, String(data.humidity).c_str(), strlen(String(data.humidity).c_str()));
-        strncat(json, "}", 2);        
+#endif
 
+        // Fill json string to send with value from struct
+        char json[128];
+        memset(json, 0, sizeof(json));
+        snprintf(json, sizeof(json), "{\"time\" : %lu, \"temperature\" : %2.2f, \"humidity\" : %2.2f}",
+                                         data.time,      data.temperature,        data.humidity);
+                                        
         client.publish("test_channel", json, strlen(json));
+
+#if VERBOSE
         Serial.print("Sent : ");
         Serial.println(json);
+#endif
     }
 }

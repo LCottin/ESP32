@@ -35,4 +35,4 @@
 *.vscode
 */*/README
 **/CONFIGS.hpp
-*.DS_Store
+**/.DS_Store
